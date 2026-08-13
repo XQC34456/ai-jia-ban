@@ -1,0 +1,69 @@
+"""A3 Intent Router：拒算门（优先）→ 确定性关键词 → LLM 兜底 → Literal 七意图校验 → 兜底。
+
+优先级（A3.1 冻结，不可调换）：
+    拒算门 ↓ 确定性场景/意图关键词 ↓ LLM 结构化兜底 ↓ Literal 七意图校验 ↓ 仍失败 → VIEW_OVERVIEW
+
+本模块只做「识别」，不做任何财富计算，也不产出数字。
+"""
+from __future__ import annotations
+
+from ..schemas.agent import AGENT_INTENTS
+from .provider import LLMProvider
+
+__all__ = ["refusal_gate", "route_intent"]
+
+_ROUTER_SYSTEM = (
+    "你是财富顾问的意图路由器。只判断用户消息属于以下七类意图之一，输出 JSON "
+    "{\"intent\": \"<其中一个>\"}，禁止输出七类之外的值。七类：VIEW_OVERVIEW / "
+    "CHECK_ISSUES / CHECK_RETIREMENT / CHECK_ALLOCATION / CHECK_GOALS / "
+    "SCENARIO_COMPARE / EXPLAIN_RESULT。"
+)
+
+# 确定性意图关键词（顺序即优先级：场景 > 问题 > 退休 > 配置 > 目标 > 解释）。
+_INTENT_KEYWORDS = (
+    ("SCENARIO_COMPARE", ("买房", "购房", "买套", "提前还贷", "还贷", "投资", "投入", "买入",
+                          "收入下降", "降薪", "涨薪", "加薪")),
+    ("CHECK_ISSUES", ("问题", "风险", "告警", "隐患")),
+    ("CHECK_RETIREMENT", ("退休", "养老", "养老金", "RFR", "NWC")),
+    ("CHECK_ALLOCATION", ("配置", "资产占比", "集中度", "持仓", "分散", "资产分配")),
+    ("CHECK_GOALS", ("目标", "教育金", "上学", "攒钱", "计划")),
+    ("EXPLAIN_RESULT", ("为什么", "解释", "说明", "原因")),
+)
+
+# 测算类信号词：命中则拒算门优先于普通意图路由。
+_COMPUTE_WORDS = ("算", "复利", "年化", "收益", "利息", "测算", "回报", "涨到", "增值")
+# 纯金融计算器信号（无家庭上下文）→ 直接拒绝，不自算。
+_PURE_CALC_WORDS = ("复利", "年化", "单利", "本金")
+
+
+def refusal_gate(message: str) -> dict | None:
+    """拒算门：命中测算关键词时优先于普通意图路由。
+
+    返回：
+    - None                 → 非测算请求，走普通路由
+    - {"scenario": "invest"} → 可表达为投资情景，转 SCENARIO_COMPARE（缺参数再追问）
+    - {"refuse": True}     → 纯金融计算，无家庭上下文，拒绝自行计算
+    """
+    if not any(w in message for w in _COMPUTE_WORDS):
+        return None
+    if any(w in message for w in _PURE_CALC_WORDS):
+        return {"refuse": True}
+    return {"scenario": "invest"}
+
+
+def route_intent(message: str, llm: LLMProvider | None = None) -> str:
+    """确定性关键词 → LLM 兜底 → Literal 七意图校验 → 兜底 VIEW_OVERVIEW。"""
+    for intent, words in _INTENT_KEYWORDS:
+        if any(w in message for w in words):
+            return intent
+    if llm is not None:
+        raw = llm.complete_json(
+            system=_ROUTER_SYSTEM,
+            user=message,
+            schema={"type": "object",
+                    "properties": {"intent": {"type": "string", "enum": list(AGENT_INTENTS)}},
+                    "required": ["intent"]},
+        )
+        if raw and raw.get("intent") in AGENT_INTENTS:
+            return raw["intent"]
+    return "VIEW_OVERVIEW"

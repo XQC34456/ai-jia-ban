@@ -7,8 +7,22 @@ from .tools import (
     ToolError, resolve_scenario_name,
     get_overview, get_issues, get_goals, compare_scenario,
 )
+from .provider import LLMProvider, NullProvider, FakeLLMProvider
+from .router import refusal_gate, route_intent
+from .params import PARAM_LABELS, ParamResult, extract_scenario_params
+from .dispatch import INTENT_TOOL, dispatch
+from .errors import map_tool_error
+from .response import build_metrics, known_limitations_of, build_response
+from .runtime import handle
 
 __all__ = [
     "ToolError", "resolve_scenario_name",
     "get_overview", "get_issues", "get_goals", "compare_scenario",
+    "LLMProvider", "NullProvider", "FakeLLMProvider",
+    "refusal_gate", "route_intent",
+    "PARAM_LABELS", "ParamResult", "extract_scenario_params",
+    "INTENT_TOOL", "dispatch",
+    "map_tool_error",
+    "build_metrics", "known_limitations_of", "build_response",
+    "handle",
 ]
