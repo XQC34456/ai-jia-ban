@@ -90,3 +90,19 @@ class AgentRequest(BaseModel):
     """Agent 自然语言请求体。message 必填（1~2000 字），context 供 EXPLAIN_RESULT 复用。"""
     message: str = Field(min_length=1, max_length=2000)
     context: dict | None = None
+
+
+# ---------- 建档确认卡片（Phase 6C 吸收 V1 建档能力，非七意图、非 AgentResponse） ----------
+
+class ConfirmCard(BaseModel):
+    """建档确认卡片：抽取到动作后返回，等用户在 /api/confirm 确认落地。"""
+    type: Literal["confirm"] = "confirm"
+    pending_id: str
+    message: str
+    items: list[str] = Field(default_factory=list)
+
+
+class AppliedResponse(BaseModel):
+    """建档确认落地结果。type ∈ applied / discarded / error。"""
+    type: Literal["applied", "discarded", "error"]
+    message: str
