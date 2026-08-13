@@ -28,7 +28,7 @@ export const AllocationView = {
     return { store, finCompare };
   },
   template: `
-    <div class="view">
+    <div class="view view-sm">
       <div v-if="store.loading" class="state-hint">加载中…</div>
       <div v-else-if="store.error" class="state-hint error">{{ store.error }}</div>
       <template v-else-if="store.overview">

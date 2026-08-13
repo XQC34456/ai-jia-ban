@@ -20,7 +20,7 @@ export const RetirementView = {
     return { store, limitations, limitationLabel };
   },
   template: `
-    <div class="view">
+    <div class="view view-sm">
       <div v-if="store.loading" class="state-hint">加载中…</div>
       <div v-else-if="store.error" class="state-hint error">{{ store.error }}</div>
       <template v-else-if="store.overview">
