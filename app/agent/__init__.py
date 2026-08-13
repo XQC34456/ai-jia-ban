@@ -14,6 +14,7 @@ from .dispatch import INTENT_TOOL, dispatch
 from .errors import map_tool_error
 from .response import build_metrics, known_limitations_of, build_response
 from .runtime import handle
+from .entry import converse
 from .providers import DeepSeekProvider, get_provider
 
 __all__ = [
@@ -26,5 +27,6 @@ __all__ = [
     "map_tool_error",
     "build_metrics", "known_limitations_of", "build_response",
     "handle",
+    "converse",
     "DeepSeekProvider", "get_provider",
 ]

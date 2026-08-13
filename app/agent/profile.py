@@ -10,15 +10,19 @@ import uuid
 from typing import Any
 
 from .. import db
-from ..extraction import get_extractor
+from ..extraction import RuleExtractor
 from ..schemas.agent import AppliedResponse, ConfirmCard
 
 _PENDING: dict[str, dict[str, Any]] = {}
 
 
 def extract_actions(message: str) -> list[dict[str, Any]]:
-    """从自然语言抽取建档动作；空列表 = 非建档表述（交给 Agent 走七意图）。"""
-    return get_extractor().extract(message)
+    """从自然语言抽取建档动作；空列表 = 非建档表述（交给 Agent 走七意图）。
+
+    只用确定性规则抽取：AI 顾问主链路必须确定性、绝不 500，也不让 LLM 抽取
+    抢先把「投资/买房」等情景表述误判成建档（LLM 抽取留待后续阶段）。
+    """
+    return RuleExtractor().extract(message)
 
 
 def create_confirm(family_id: int, actions: list[dict[str, Any]]) -> ConfirmCard:

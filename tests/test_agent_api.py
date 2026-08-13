@@ -124,11 +124,29 @@ def test_agent_chat_passthrough_verbatim(client, auth_headers, monkeypatch):
     fixed = AgentResponse(intent="CHECK_ALLOCATION", status="ok", summary="固定摘要",
                           finding="固定发现", metrics=[], recommendations=["r1"],
                           next_actions=["a1"], limitations=["l1"], source=["s1"])
-    monkeypatch.setattr("app.api.agent.handle",
+    monkeypatch.setattr("app.api.agent.converse",
                         lambda message, user, llm=None, context=None: fixed)
     r = client.post("/api/agent/chat", json={"message": "看看我的配置"}, headers=auth_headers)
     assert r.status_code == 200
     assert r.json() == fixed.model_dump()              # 逐字段一致
+
+
+# ---------- ⑥ 建档确认端到端（converse → ConfirmCard → /api/confirm → AppliedResponse） ----------
+
+def test_agent_chat_profile_confirm(client, auth_headers):
+    r = client.post("/api/agent/chat", json={"message": "我月薪3万"}, headers=auth_headers)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["type"] == "confirm" and body["pending_id"] and body["items"]
+
+
+def test_confirm_apply_endpoint(client, auth_headers):
+    r = client.post("/api/agent/chat", json={"message": "我月薪3万"}, headers=auth_headers)
+    pid = r.json()["pending_id"]
+    r2 = client.post("/api/confirm", json={"pending_id": pid, "confirmed": True},
+                     headers=auth_headers)
+    assert r2.status_code == 200
+    assert r2.json()["type"] == "applied"
 
 
 # ---------- ⑤ 密钥隔离闸 ----------

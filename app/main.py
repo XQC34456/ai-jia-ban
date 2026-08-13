@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from . import chat, db, decision, report
 from .api import agent, goal, scenario, wealth
+from .agent.profile import apply_confirmation
 
 
 def _load_dotenv() -> None:
@@ -146,12 +147,14 @@ def get_family(user: dict = Depends(get_current_user)):
 
 @app.post("/api/chat")
 def chat_endpoint(body: ChatIn, user: dict = Depends(get_current_user)):
+    """@deprecated：AI 顾问统一走 /api/agent/chat（converse）。前端迁移完成后（Task 7）退役。"""
     return chat.handle_message(user["family_id"], body.message)
 
 
 @app.post("/api/confirm")
 def confirm_endpoint(body: ConfirmIn, user: dict = Depends(get_current_user)):
-    return chat.handle_confirm(user["family_id"], body.pending_id, body.confirmed)
+    """建档确认落地：已迁移到 Agent 吸收层 profile.apply_confirmation（落地前不写库）。"""
+    return apply_confirmation(user["family_id"], body.pending_id, body.confirmed).model_dump()
 
 
 @app.get("/api/report")
