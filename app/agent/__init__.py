@@ -1,0 +1,14 @@
+"""AI Agent 层：交互智能层（A2 起），把用户意图接到财富服务层。
+
+分层铁律：Tool = 获取事实，Decision = 判断，LLM = 理解 + 解释。
+本层不包含任何财富计算逻辑，绝不自行计算 Wealth Score / RFR / NWC / DTI。
+"""
+from .tools import (
+    ToolError, resolve_scenario_name,
+    get_overview, get_issues, get_goals, compare_scenario,
+)
+
+__all__ = [
+    "ToolError", "resolve_scenario_name",
+    "get_overview", "get_issues", "get_goals", "compare_scenario",
+]
