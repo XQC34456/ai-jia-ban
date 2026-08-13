@@ -32,6 +32,7 @@ uvicorn app.main:app --reload
 2. 填入你的 key：
 
 ```
+LLM_PROVIDER=deepseek
 LLM_API_KEY=sk-xxxxxxxx
 LLM_BASE_URL=https://api.deepseek.com
 LLM_MODEL=deepseek-chat
@@ -46,7 +47,8 @@ LLM_MODEL=deepseek-chat
 ## 跑测试
 
 ```bash
-python -m pytest -q
+# Windows 需带编码环境变量，否则中文输出乱码
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python -m pytest -q
 ```
 
 ---
@@ -72,10 +74,11 @@ python -m pytest -q
 
 ## API
 
-> 除注册/登录外，所有接口需带请求头 `Authorization: Bearer <token>`。数据随登录用户隔离。
+> 除 `/api/health`、注册/登录外，所有接口需带请求头 `Authorization: Bearer <token>`，未带/无效 → 401；数据随登录用户隔离。VIP 门（报告/决策/情景对比）：免费用户 → 403。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
+| GET | `/api/health` | 健康检查（无需鉴权），返回 `{ok, llm}` |
 | POST | `/api/register` | 注册，返回 token（自动创建并绑定家庭） |
 | POST | `/api/login` | 登录，返回 token |
 | GET | `/api/me` | 当前用户信息 |
@@ -83,10 +86,18 @@ python -m pytest -q
 | GET | `/api/family` | 家庭档案 + 快照 + 体检 |
 | POST | `/api/chat` | 对话，返回 confirm 或 answer |
 | POST | `/api/confirm` | 确认/撤销待定建档动作 |
+| GET | `/api/wealth/overview` | 财富驾驶舱（评分/净资产/配置/现金流/养老/问题） |
+| GET | `/api/wealth/issues` | 问题/告警/优先级/建议 |
+| GET | `/api/wealth/goals` | 目标统一测算 |
+| POST | `/api/wealth/scenario/{name}` | 情景模拟（VIP） |
+| POST | `/api/wealth/scenario/{name}/compare` | 情景对比（VIP） |
+| POST | `/api/agent/chat` | AI Agent 自然语言入口（结构化 AgentResponse） |
 | GET | `/api/report` | 深度报告（VIP 专属） |
 | POST | `/api/decision` | 决策模拟（VIP 专属） |
 | POST | `/api/family/entity/{table}` | 看板新增实体 |
 | PUT/DELETE | `/api/entity/{table}/{id}` | 看板编辑/删除实体 |
+
+> `name ∈ {buy_house, prepay, invest, income_change}`；`table ∈ {person, asset, liability, cashflow, ...}`。
 
 ---
 
