@@ -136,7 +136,9 @@ def migrate() -> None:
         cur = conn.execute("SELECT value FROM meta WHERE key='schema_version'")
         row = cur.fetchone()
         version = int(row[0]) if row else 0
-        # V2 迁移序列在此按 version 递增追加（见 _migrate_v1 / _migrate_v2 / _migrate_v3）
+        if version < 1:
+            _migrate_v1(conn)
+            version = 1
         conn.execute(
             "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
             (str(version),),
@@ -144,6 +146,36 @@ def migrate() -> None:
         conn.commit()
     finally:
         conn.close()
+
+
+def _add_column_if_missing(conn: sqlite3.Connection, table: str, col: str, ddl: str) -> None:
+    cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if col not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+
+
+_ASSET_CLASS_MAP = {
+    "房产": "real_estate", "存款": "cash", "理财": "fixed_income",
+    "基金": "fixed_income", "股票": "equity", "保险现金价值": "other", "其他": "other",
+}
+
+
+def _migrate_v1(conn: sqlite3.Connection) -> None:
+    """V2.0：asset 表新增资产大类/流动性/成本/收益/风险/子类 6 列，并按 type 回填大类。"""
+    for col, ddl in [
+        ("asset_class", "TEXT"),
+        ("liquidity", "TEXT"),
+        ("cost_basis", "REAL"),
+        ("expected_return", "REAL"),
+        ("risk_level", "TEXT"),
+        ("sub_type", "TEXT"),
+    ]:
+        _add_column_if_missing(conn, "asset", col, ddl)
+    for old_type, new_class in _ASSET_CLASS_MAP.items():
+        conn.execute(
+            "UPDATE asset SET asset_class = ? WHERE type = ? AND asset_class IS NULL",
+            (new_class, old_type),
+        )
 
 
 def create_family(name: str = "我的家庭") -> int:
