@@ -8,6 +8,7 @@ import { GoalsView } from './goals.js';
 import { IssuesView } from './issues.js';
 import { SandboxView } from './sandbox.js';
 import { ChatView } from './chat.js';
+import { DataView } from './data.js';
 
 export const VIEWS = {
   overview: OverviewView,
@@ -18,10 +19,12 @@ export const VIEWS = {
   issues: IssuesView,
   sandbox: SandboxView,
   chat: ChatView,
+  data: DataView,
 };
 
 export const NAV_ITEMS = [
   { route: 'overview', label: '家庭总览', icon: 'home' },
+  { route: 'data', label: '家庭数据', icon: 'data' },
   { route: 'health', label: '财富健康', icon: 'health' },
   { route: 'allocation', label: '资产配置', icon: 'allocation' },
   { route: 'retirement', label: '退休规划', icon: 'retirement' },

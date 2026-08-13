@@ -498,3 +498,17 @@ button { font-family: inherit; }
   .report-modal, .report-modal * { visibility: visible; }
   .report-modal { position: absolute; inset: 0; width: 100%; max-width: none; max-height: none; box-shadow: none; border-radius: 0; }
 }
+
+/* ============================================================
+   家庭数据（可编辑闭环）
+   ============================================================ */
+.data-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.data-count { color: var(--muted); font-size: 13px; }
+
+.data-panel { padding: 0; overflow: hidden; }
+.data-table th.ops, .data-table td.ops { text-align: right; white-space: nowrap; }
+.data-table td.ops { display: flex; gap: 6px; justify-content: flex-end; }
+.data-table .btn-mini.danger { color: var(--score-bad); }
+.data-table .btn-mini.danger:hover { border-color: #fecaca; background: var(--warn-soft); }
+
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }

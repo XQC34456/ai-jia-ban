@@ -3,8 +3,6 @@
 //   - overview 只来自 /api/wealth/overview；goals / issues / sandbox / chat 各有独立切片与端点，
 //     不把所有数据硬塞进 overview。
 //   - 任何派生 computed 只做展示（格式化/排序/筛选/着色），绝不产生财富结论。
-//   - 向后兼容：store.auth / store.overview / store.loading / store.error 保留给未迁移的
-//     cockpit/sandbox/xray 使用（迁移完成后统一收进各自切片）。
 import { api } from './api.js';
 
 const { reactive, computed } = Vue;
@@ -28,6 +26,9 @@ export const store = reactive({
 
   // —— 切片：AI 顾问对话（Phase 4 迁移 vanilla chat 后启用）——
   chat: { messages: [], loading: false, error: null },
+
+  // —— 切片：家庭数据（Phase 6A 可编辑闭环：读 /api/family，写 entity CRUD）——
+  family: { data: null, loading: false, error: null, saving: false },
 });
 
 function applySession(r) {
@@ -59,6 +60,7 @@ export function logout() {
   store.sandbox.result = null;
   store.sandbox.comparison = null;
   store.chat.messages = [];
+  store.family.data = null;
   localStorage.removeItem('token');
 }
 
@@ -110,6 +112,46 @@ export async function loadIssues() {
   } finally {
     store.issues.loading = false;
   }
+}
+
+export async function loadFamily() {
+  store.family.loading = true;
+  store.family.error = null;
+  try {
+    const r = await api('/api/family', { token: store.auth.token });
+    store.family.data = r.data;
+    return r;
+  } catch (e) {
+    store.family.error = e.message;
+    throw e;
+  } finally {
+    store.family.loading = false;
+  }
+}
+
+// 家庭数据写操作后，让驾驶舱/目标/问题的派生结果失效，下次访问时按新数据重取。
+export function invalidateWealthCaches() {
+  store.overview = null;
+  store.goals.data = null;
+  store.issues.data = null;
+}
+
+export async function createEntity(table, payload) {
+  const r = await api(`/api/family/entity/${table}`, { method: 'POST', body: payload, token: store.auth.token });
+  invalidateWealthCaches();
+  return r;
+}
+
+export async function updateEntity(table, id, payload) {
+  const r = await api(`/api/entity/${table}/${id}`, { method: 'PUT', body: payload, token: store.auth.token });
+  invalidateWealthCaches();
+  return r;
+}
+
+export async function deleteEntity(table, id) {
+  const r = await api(`/api/entity/${table}/${id}`, { method: 'DELETE', token: store.auth.token });
+  invalidateWealthCaches();
+  return r;
 }
 
 // ---------- 派生（纯展示：格式化/阈值着色，不重算财富） ----------
