@@ -5,13 +5,14 @@
 """
 from __future__ import annotations
 
+import copy
 import math
 from typing import Any
 
 from . import allocation, metrics
 
 __all__ = [
-    "SCENARIOS", "run_scenario", "ASSET_CLASS_PROFILE",
+    "SCENARIOS", "run_scenario", "apply_scenario", "ASSET_CLASS_PROFILE",
     "monthly_payment", "remaining_principal", "months_to_clear",
     "simulate_buy_house", "simulate_prepay", "simulate_invest", "simulate_income_change",
 ]
@@ -431,3 +432,140 @@ def run_scenario(data: dict[str, Any], snap: dict[str, Any], scenario: str, para
     if fn is None:
         return {"scenario": scenario, "title": "决策模拟", "error": f"未知场景: {scenario}"}
     return fn(data, snap, params)
+
+
+# ---------- 场景应用原语（C3）：把情景「应用」为家庭数据副本，不重算任何数字 ----------
+# 铁律：apply_scenario 只修改家庭数据状态（资产/负债/现金流），绝不计算
+# Wealth Score / RFR / NWC / DTI 等财富指标——这些统一由 build_overview(modified_data)
+# 用同一套 Engine 重算。每个 option 都必须从同一份 baseline data 独立深拷贝再 apply，
+# 绝不链式 apply（A→B→C），避免「买完房再投资」这类状态污染。
+
+# 资产大类 → 新增资产时用的 type 字符串（asset_class 字段仍显式写入，保证精确分类）
+_CLASS_TO_TYPE = {
+    "cash": "存款", "fixed_income": "理财", "equity": "股票",
+    "real_estate": "房产", "alternative": "其他", "other": "其他",
+}
+
+
+def _drain_liquid(assets: list[dict[str, Any]], amount: float) -> None:
+    """从流动现金资产中依次扣除 amount（就地修改 assets，调用方须先传副本）。
+
+    扣除口径与 metrics.liquid_assets 完全一致（type ∈ LIQUID_ASSET_TYPES），
+    保证扣除后 liquid_assets(modified) == liquid_assets(original) - amount。
+    不足时抛 ValueError（由 /compare API 层统一转 400）。
+    """
+    liquid_items = [a for a in assets if a.get("type") in _LIQUID]
+    available = sum(float(a.get("value") or 0) for a in liquid_items)
+    if amount > available + 1e-9:
+        raise ValueError(f"所需资金 {amount:,.0f} 元超过可用流动现金 {available:,.0f} 元")
+    remaining = amount
+    for a in liquid_items:
+        if remaining <= 0:
+            break
+        val = float(a.get("value") or 0)
+        take = min(val, remaining)
+        a["value"] = round(val - take, 2)
+        remaining -= take
+
+
+def _apply_buy_house(d: dict[str, Any], p: dict[str, Any]) -> None:
+    price = float(p.get("price") or 0)
+    if price <= 0:
+        raise ValueError("请填写房价")
+    down_ratio = float(p.get("down_payment_ratio") or 0.3)
+    loan_rate = _rate(p.get("loan_rate"))
+    loan_years = int(p.get("loan_years") or 30)
+    down = price * down_ratio
+    loan = price - down
+    payment = monthly_payment(loan, loan_rate, loan_years)
+
+    assets = d.setdefault("assets", [])
+    _drain_liquid(assets, down)                      # 首付由流动现金支出
+    assets.append({"type": "房产", "name": "情景购房", "value": round(price, 2)})
+    d.setdefault("liabilities", []).append({
+        "type": "房贷", "name": "情景房贷", "principal": round(loan, 2),
+        "monthly_payment": round(payment, 2), "interest_rate": round(loan_rate, 4),
+        "remaining_months": loan_years * 12,
+    })
+
+
+def _apply_prepay(d: dict[str, Any], p: dict[str, Any]) -> None:
+    prepay = float(p.get("prepay_amount") or 0)
+    method = p.get("method") or "shorten"
+    if prepay <= 0:
+        raise ValueError("请填写提前还款金额")
+    mort = next((l for l in d.get("liabilities", []) if l.get("type") == "房贷"), None)
+    if mort is None:
+        raise ValueError("还没有房贷记录，请先在「负债」页添加一条房贷")
+    principal = float(mort.get("principal") or 0)
+    if principal <= 0:
+        raise ValueError("房贷缺「剩余本金」")
+    if prepay > principal:
+        raise ValueError(f"提前还款金额超过剩余本金 {principal:,.0f} 元")
+    rate = _rate(mort.get("interest_rate"))
+    months = int(mort.get("remaining_months") or 0)
+    payment_given = float(mort.get("monthly_payment") or 0)
+    if months <= 0:
+        if payment_given <= 0:
+            raise ValueError("房贷缺「剩余期数」或「月供」")
+        months = months_to_clear(principal, rate, payment_given)
+    payment = _payment_months(principal, rate, months)
+
+    _drain_liquid(d.setdefault("assets", []), prepay)   # 还款资金来自流动现金
+
+    new_principal = max(principal - prepay, 0.0)
+    mort["principal"] = round(new_principal, 2)
+    if new_principal <= 0:
+        mort["monthly_payment"] = 0.0
+        mort["remaining_months"] = 0
+    elif method == "shorten":
+        mort["monthly_payment"] = round(payment, 2)     # 月供不变，缩短期限
+        mort["remaining_months"] = months_to_clear(new_principal, rate, payment)
+    else:  # reduce：月供下降、期限不变
+        mort["monthly_payment"] = round(_payment_months(new_principal, rate, months), 2)
+        mort["remaining_months"] = months
+
+
+def _apply_invest(d: dict[str, Any], p: dict[str, Any]) -> None:
+    amount = float(p.get("amount") or 0)
+    if amount <= 0:
+        raise ValueError("请填写投资金额")
+    to_class = p.get("to_class") or "equity"
+    if to_class not in allocation.ASSET_CLASSES:
+        raise ValueError(f"未知资产大类: {to_class}")
+
+    _drain_liquid(d.setdefault("assets", []), amount)   # 投资资金来自流动现金
+    d.setdefault("assets", []).append({
+        "type": _CLASS_TO_TYPE.get(to_class, "其他"), "name": "情景投资",
+        "asset_class": to_class, "value": round(amount, 2),
+    })
+
+
+def _apply_income_change(d: dict[str, Any], p: dict[str, Any]) -> None:
+    pct_change = float(p.get("pct_change") or 0)
+    for c in d.get("cashflows", []):
+        if c.get("flow_type") == "income":
+            c["amount"] = round(float(c.get("amount") or 0) * (1 + pct_change), 2)
+
+
+_APPLY = {
+    "buy_house": _apply_buy_house,
+    "prepay": _apply_prepay,
+    "invest": _apply_invest,
+    "income_change": _apply_income_change,
+}
+
+
+def apply_scenario(data: dict[str, Any], name: str, params: dict[str, Any]) -> dict[str, Any]:
+    """返回「应用情景后的家庭数据副本」modified_data，绝不修改入参 data。
+
+    纯函数：内部深拷贝 data → 按场景做数据补丁 → 返回副本。
+    校验失败抛 ValueError（由 /compare API 层统一转 HTTP 400）。
+    本函数不计算任何财富指标；重算由调用方 build_overview(modified_data) 完成。
+    """
+    modified = copy.deepcopy(data)
+    fn = _APPLY.get(name)
+    if fn is None:
+        raise ValueError(f"未知场景: {name}")
+    fn(modified, params or {})
+    return modified

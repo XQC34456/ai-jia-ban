@@ -22,6 +22,7 @@ body { background: var(--bg); color: var(--text);
 .btn-primary { padding: 11px 16px; border: none; border-radius: 8px; background: var(--brand); color: #fff;
   font-size: 14px; font-weight: 600; cursor: pointer; }
 .btn-primary:hover { background: #1d4ed8; }
+.btn-link { display: inline-block; text-decoration: none; text-align: center; }
 .auth-switch { text-align: center; font-size: 13px; }
 .auth-switch a { color: var(--brand); cursor: pointer; }
 

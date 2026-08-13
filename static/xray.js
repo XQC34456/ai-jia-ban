@@ -31,7 +31,6 @@ const CLASS_COLORS = { cash: '#34c759', fixed_income: '#5ac8fa', equity: '#ff950
 const App = {
   setup() {
     const auth = reactive({ mode: 'login', username: '', password: '', error: '' });
-    const sandboxHint = reactive({ show: false });
 
     async function submit() {
       auth.error = '';
@@ -88,7 +87,7 @@ const App = {
       classes, target, concentration, fitness, liquidity,
       deviation, adjustments, issueReasons,
       finPct, tgtPct, devLabel, devTone, pctOr0,
-      fmtMoney, fmtPct, fmtNum, FIN, FIN_LABELS, FIN_COLORS, sandboxHint,
+      fmtMoney, fmtPct, fmtNum, FIN, FIN_LABELS, FIN_COLORS,
     };
   },
   template: `
@@ -222,10 +221,10 @@ const App = {
 
         <!-- 进入沙盘 -->
         <section class="panel action-panel">
-          <button class="btn-primary" @click="sandboxHint.show = true">调整我的资产配置</button>
-          <div v-if="sandboxHint.show" class="warn-note">
-            ⏳ 财富沙盘将在 C3 开放——调整后的财富评分 / RFR / NWC 统一由 apply_scenario → build_overview 计算，本页不提前预测。
-          </div>
+          <a href="/static/sandbox.html" class="btn-primary btn-link">调整我的资产配置 → 财富沙盘</a>
+          <p class="warn-note">
+            调整后的财富评分 / RFR / NWC 统一由沙盘的 apply_scenario → build_overview 计算，本页不提前预测。
+          </p>
         </section>
       </main>
     </template>

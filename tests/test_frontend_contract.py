@@ -6,7 +6,7 @@
 约束：本文件只 import app.schemas（契约层），不 import app.engine / app.decision / app.services。
 """
 from app.schemas import Overview
-from app.schemas.scenario import SCENARIO_NAMES
+from app.schemas.scenario import SCENARIO_NAMES, SCENARIO_METRIC_KEYS, CompareResponse
 
 
 def test_error_contract_unauthorized(client):
@@ -57,3 +57,26 @@ def test_decision_recommendation_scenario_chain(client, auth_headers):
                 assert rec["actionable"] is True
             # 目标为数值 dict（供场景参数化）
             assert isinstance(rec["target"], dict)
+
+
+def test_compare_contract_for_sandbox(client, auth_headers):
+    """C3 沙盘前端只依赖 CompareResponse：后端字段变化时本测试首先报警，沙盘不静默崩。"""
+    client.post("/api/family/entity/person", headers=auth_headers,
+                json={"name": "本人", "relation": "本人", "birth_year": 1990})
+    client.post("/api/family/entity/asset", headers=auth_headers,
+                json={"type": "存款", "name": "现金", "value": 1500000})
+    client.post("/api/family/entity/cashflow", headers=auth_headers,
+                json={"flow_type": "income", "amount": 50000, "period": "月"})
+    client.post("/api/family/entity/cashflow", headers=auth_headers,
+                json={"flow_type": "expense", "amount": 20000, "period": "月"})
+    client.post("/api/upgrade", headers=auth_headers)
+
+    r = client.post("/api/wealth/scenario/invest/compare", headers=auth_headers,
+                    json={"options": [{"id": "A", "params": {"amount": 300000, "to_class": "equity"}}]})
+    assert r.status_code == 200
+    resp = CompareResponse.model_validate(r.json())   # 契约校验：前端只依赖这个模型
+    assert resp.scenario == "invest"
+    assert isinstance(resp.baseline, Overview)
+    assert [o.id for o in resp.options] == ["A"]
+    # 对比表行序 = 冻结的九指标顺序
+    assert [m.key for m in resp.comparison["A"]] == list(SCENARIO_METRIC_KEYS)
