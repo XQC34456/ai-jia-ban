@@ -56,7 +56,7 @@ PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python -m pytest -q
 ## 架构
 
 ```
-接入层       Web H5（static/）
+接入层       Web H5（static/，Vue 3 单页 App Shell + hash 路由，8 视图）
    ↓
 对话编排层   app/chat.py    抽取 → 确认 → 落地 → 重算 → 反馈（状态机）
    ↓
@@ -103,10 +103,13 @@ PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python -m pytest -q
 
 ## 已完成
 
-- 数据看板（6 页签、可编辑表格、资产配置 donut、目标进度）
-- 深度报告（LLM 建议 + 打印导出 PDF）
-- 决策模拟器（买房 / 提前还贷）
-- 登录 + VIP 分层（免费=对话+体检；VIP=报告+决策；模拟开通按钮）
+- 统一 App Shell（`/` 单页 + hash 路由：Sidebar 8 项 + Topbar + 主内容区）
+- 8 个视图：家庭总览 / 财富健康 / 资产配置 / 退休规划 / 家庭目标 / 风险问题 / 情景沙盘 / AI 顾问
+- 家庭总览：财富评分 / 净资产 / 资产配置 / 现金流 / 流动性 / 债务 / 保障 / 养老 + AI 主动洞察（确定性 `build_issues`，非 LLM）
+- 情景沙盘：买房 / 提前还贷 / 投资 / 收入变化，1~3 方案对比（VIP）
+- 深度报告（LLM 建议 + 打印导出 PDF，VIP）
+- 决策模拟器（买房 / 提前还贷，VIP）
+- 登录 + VIP 分层（免费=对话建档 + 体检 + 目标 + 问题 + 各只读视图；VIP=报告 + 决策 + 情景沙盘；模拟开通按钮）
 
 ## 下一步（V2/V3）
 
