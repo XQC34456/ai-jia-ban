@@ -151,3 +151,33 @@ def test_migrate_goal_kind_backfill(tmp_path, monkeypatch):
     assert r["priority"] == 2
     assert r["risk_tolerance"] == "balanced"
     conn.close()
+
+
+def test_migrate_new_tables(tmp_path, monkeypatch):
+    """V1 老库升级：新建 insurance / family_profile / scenario_snapshot 三张表。"""
+    _init_v1_db(tmp_path, monkeypatch)
+    db.migrate()
+    conn = db.get_conn()
+    names = _table_names(conn)
+    assert {"insurance", "family_profile", "scenario_snapshot"} <= names
+    conn.execute("INSERT INTO insurance (family_id, type, name, annual_premium, coverage) "
+                 "VALUES (1, '重疾', '重疾险', 8000, 500000)")
+    conn.commit()
+    assert conn.execute("SELECT COUNT(*) FROM insurance").fetchone()[0] == 1
+    conn.close()
+
+
+def test_dump_family_includes_insurance(tmp_path, monkeypatch):
+    """dump_family 应包含保险（保障/风险转移是独立模型，不算投资资产）。"""
+    _init_v1_db(tmp_path, monkeypatch)
+    db.migrate()
+    conn = db.get_conn()
+    conn.execute("INSERT INTO insurance (family_id, type, name, annual_premium, coverage) "
+                 "VALUES (1, '重疾', '重疾险', 8000, 500000)")
+    conn.commit()
+    conn.close()
+    data = db.dump_family(1)
+    assert "insurance" in data
+    assert "family_profile" in data
+    assert len(data["insurance"]) == 1
+    assert data["insurance"][0]["coverage"] == 500000

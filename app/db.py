@@ -143,6 +143,9 @@ def migrate() -> None:
         if version < 2:
             _migrate_v2(conn)
             version = 2
+        if version < 3:
+            _migrate_v3(conn)
+            version = 3
         conn.execute(
             "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
             (str(version),),
@@ -196,6 +199,49 @@ def _migrate_v2(conn: sqlite3.Connection) -> None:
     conn.execute("UPDATE goal SET goal_kind = 'lump_sum' WHERE goal_kind IS NULL")
     conn.execute("UPDATE goal SET priority = 2 WHERE priority IS NULL")
     conn.execute("UPDATE goal SET risk_tolerance = 'balanced' WHERE risk_tolerance IS NULL")
+
+
+def _migrate_v3(conn: sqlite3.Connection) -> None:
+    """V2.0：新建保险/家庭画像/情景快照三张表。
+
+    保险作为「保障/风险转移」独立建模，不进入权益/固收/现金占比。
+    """
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS insurance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            family_id INTEGER NOT NULL,
+            person_id INTEGER,
+            type TEXT,
+            name TEXT,
+            annual_premium REAL,
+            coverage REAL,
+            cash_value REAL,
+            start_date TEXT,
+            maturity_date TEXT,
+            FOREIGN KEY(family_id) REFERENCES family(id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS family_profile (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            family_id INTEGER NOT NULL UNIQUE,
+            risk_profile TEXT DEFAULT 'balanced',
+            investment_horizon INTEGER DEFAULT 10,
+            risk_answers TEXT,
+            FOREIGN KEY(family_id) REFERENCES family(id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS scenario_snapshot (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            family_id INTEGER NOT NULL,
+            scenario TEXT NOT NULL,
+            params_json TEXT,
+            result_json TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(family_id) REFERENCES family(id)
+        )
+    """)
 
 
 def create_family(name: str = "我的家庭") -> int:
@@ -264,6 +310,15 @@ def get_reminders(family_id: int) -> list[dict[str, Any]]:
     return _rows("SELECT * FROM reminder WHERE family_id = ?", (family_id,))
 
 
+def get_insurances(family_id: int) -> list[dict[str, Any]]:
+    return _rows("SELECT * FROM insurance WHERE family_id = ?", (family_id,))
+
+
+def get_family_profile(family_id: int) -> Optional[dict[str, Any]]:
+    rows = _rows("SELECT * FROM family_profile WHERE family_id = ?", (family_id,))
+    return rows[0] if rows else None
+
+
 def find_person_by_name(family_id: int, name: str) -> Optional[dict[str, Any]]:
     rows = _rows("SELECT * FROM person WHERE family_id = ? AND name = ?", (family_id, name))
     return rows[0] if rows else None
@@ -279,6 +334,8 @@ def dump_family(family_id: int) -> dict[str, Any]:
         "cashflows": get_cashflows(family_id),
         "goals": get_goals(family_id),
         "reminders": get_reminders(family_id),
+        "insurance": get_insurances(family_id),
+        "family_profile": get_family_profile(family_id),
     }
 
 
