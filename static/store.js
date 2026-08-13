@@ -76,6 +76,10 @@ export async function loadOverview() {
   }
 }
 
+export async function ensureOverview() {
+  if (store.overview == null && !store.loading) await loadOverview();
+}
+
 export async function upgrade() {
   const r = await api('/api/upgrade', { method: 'POST', token: store.auth.token });
   store.auth.tier = r.tier || 'vip';

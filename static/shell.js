@@ -4,6 +4,7 @@ import { store, loggedIn, login, register, logout, upgrade } from './store.js';
 import { currentRoute, navigate } from './router.js';
 import { VIEWS, NAV_ITEMS } from './views/index.js';
 import { icon } from './icons.js';
+import { fmtMoney, fmtPct } from './format.js';
 
 const { createApp, ref, computed, onMounted } = Vue;
 
@@ -110,4 +111,8 @@ const App = {
     </div>`,
 };
 
-createApp(App).mount('#app');
+const app = createApp(App);
+// 全局展示格式化（纯格式化，不产生财富结论），供卡片模板 $money / $pct 使用。
+app.config.globalProperties.$money = fmtMoney;
+app.config.globalProperties.$pct = fmtPct;
+app.mount('#app');
