@@ -1,0 +1,135 @@
+/* 财富驾驶舱样式（C1）：独立于旧 MVP 的 style.css，避免互相干扰。 */
+:root {
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --line: #e6e8ec;
+  --text: #1c2433;
+  --muted: #7a8494;
+  --good: #16a34a;
+  --warn: #d97706;
+  --bad: #dc2626;
+  --brand: #2563eb;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ---------- 登录 ---------- */
+.auth-mask {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.auth-card {
+  width: 360px; background: var(--card); border-radius: 16px; padding: 32px 28px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.08); display: flex; flex-direction: column; gap: 12px;
+}
+.auth-title { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.auth-title .logo { font-size: 22px; }
+.auth-sub { color: var(--muted); font-size: 13px; }
+.auth-error { background: #fee2e2; color: var(--bad); padding: 8px 10px; border-radius: 8px; font-size: 13px; }
+.auth-card input {
+  padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; outline: none;
+}
+.auth-card input:focus { border-color: var(--brand); }
+.btn-primary {
+  padding: 11px; border: none; border-radius: 8px; background: var(--brand); color: #fff;
+  font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.btn-primary:hover { background: #1d4ed8; }
+.auth-switch { text-align: center; font-size: 13px; }
+.auth-switch a { color: var(--brand); cursor: pointer; }
+
+/* ---------- 顶栏 ---------- */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; padding: 14px 24px;
+  background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10;
+}
+.brand { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.brand .logo { font-size: 20px; }
+.brand-sub { color: var(--muted); font-weight: 400; font-size: 13px; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.user { font-weight: 600; }
+.tier { padding: 3px 10px; border-radius: 20px; background: #eef1f5; color: var(--muted); font-size: 12px; }
+.tier.vip { background: #fef3c7; color: #92400e; }
+.btn-ghost {
+  padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;
+  cursor: pointer; font-size: 13px; color: var(--text);
+}
+.btn-ghost:hover { background: #f0f2f5; }
+
+/* ---------- 主体 ---------- */
+.state-hint { padding: 60px 20px; text-align: center; color: var(--muted); }
+.state-hint.error { color: var(--bad); }
+
+.grid {
+  max-width: 1200px; margin: 0 auto; padding: 24px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+}
+@media (max-width: 1000px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px;
+  display: flex; flex-direction: column; gap: 10px; min-height: 140px;
+}
+.card-title { font-size: 13px; color: var(--muted); font-weight: 600; }
+
+.big-num { font-size: 26px; font-weight: 700; }
+
+/* 健康度 */
+.card-score { align-items: center; justify-content: center; text-align: center; }
+.score-big { font-size: 48px; font-weight: 800; line-height: 1; }
+.score-level { font-size: 14px; font-weight: 600; }
+.good { color: var(--good); }
+.warn { color: var(--warn); }
+.bad { color: var(--bad); }
+.neutral { color: var(--muted); }
+
+/* 键值行 */
+.kv { display: flex; justify-content: space-between; align-items: baseline; }
+.kv span { color: var(--muted); }
+.kv b { font-weight: 600; }
+.pos { color: var(--good); }
+.neg { color: var(--bad); }
+
+/* 配置 */
+.fitness { font-weight: 400; font-size: 12px; margin-left: 6px; }
+.alloc-bar { display: flex; height: 14px; border-radius: 8px; overflow: hidden; background: #f0f2f5; }
+.alloc-seg { height: 100%; transition: width .3s; }
+.alloc-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.legend-item b { color: var(--text); font-weight: 600; }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+/* 养老 */
+.quadrant { align-self: flex-start; padding: 3px 10px; border-radius: 6px; font-size: 13px; font-weight: 600; }
+.quadrant.pos { background: #dcfce7; }
+.quadrant.neg { background: #fee2e2; }
+.limits { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.limit-tag { font-size: 10px; color: var(--muted); background: #f0f2f5; border-radius: 4px; padding: 1px 6px; }
+
+/* 目标 */
+.goal-row { border-top: 1px solid var(--line); padding-top: 8px; }
+.goal-top { display: flex; justify-content: space-between; align-items: center; }
+.goal-type { font-size: 12px; color: var(--muted); }
+.goal-progress { height: 6px; border-radius: 4px; background: #eef1f5; overflow: hidden; margin: 6px 0 4px; }
+.goal-progress i { display: block; height: 100%; background: var(--brand); }
+.goal-meta { font-size: 12px; color: var(--muted); }
+
+/* 问题 */
+.issue-row { display: flex; gap: 10px; align-items: flex-start; border-top: 1px solid var(--line); padding-top: 10px; }
+.issue-row:first-of-type { border-top: none; padding-top: 0; }
+.sev { flex-shrink: 0; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; color: #fff; }
+.sev-p0 { background: var(--bad); }
+.sev-p1 { background: var(--warn); }
+.sev-p2 { background: #94a3b8; }
+.issue-title { font-weight: 600; }
+.issue-finding { font-size: 12px; color: var(--muted); }
+
+.empty-hint { color: var(--muted); font-size: 13px; padding: 8px 0; }
