@@ -10,7 +10,7 @@ from typing import Any
 
 from . import allocation, metrics, projection
 
-__all__ = ["WEIGHTS", "wealth_score"]
+__all__ = ["WEIGHTS", "wealth_score", "retirement_ratio"]
 
 WEIGHTS = {
     "cashflow": 0.20,    # 现金流 / 储蓄率
@@ -170,16 +170,7 @@ def _retirement_dim(family_data):
             reasons.append("距 25 倍年支出的养老目标仍有差距")
         return {"name": "retirement", "score": round(score), "reasons": reasons}
 
-    annual_income = metrics.monthly_income(cashflows) * 12
-    pol = allocation.personalized_policy(
-        profile=family_data.get("family_profile"),
-        goals=family_data.get("goals"),
-        liabilities=liabilities,
-        cashflows=cashflows,
-    )
-    rfr = projection.retirement_funding_ratio(
-        _asset_values(assets), _debts(liabilities), annual_income, annual_exp,
-        current_age, allocation=pol["target"])
+    rfr = retirement_ratio(family_data)
     reasons = [f"退休({rfr['retirement_age']}岁)时可投资资产 {rfr['investable_at_retirement']:,.0f} 元，"
                f"退休后资金需求现值 {rfr['retirement_need_pv']:,.0f} 元，"
                f"资金覆盖比(RFR) {rfr['funding_ratio']:.2f}，净资产覆盖比(NWC) {rfr['net_worth_coverage']:.2f}"]
@@ -191,6 +182,33 @@ def _retirement_dim(family_data):
         else:
             reasons.append("退休资金覆盖比低于 1，养老资金不足")
     return {"name": "retirement", "score": rfr["score"], "reasons": reasons}
+
+
+def retirement_ratio(family_data: dict[str, Any]) -> dict[str, Any] | None:
+    """公开入口：返回 Retirement Funding Ratio 完整结果（RFR/NWC/score 等）。
+
+    供 Decision Layer 与 Overview 复用同一份投影结果（DRY）。
+    无年龄信息或未记录支出时返回 None，调用方自行回退 4% 法则等启发式。
+    """
+    assets = family_data.get("assets", [])
+    liabilities = family_data.get("liabilities", [])
+    cashflows = family_data.get("cashflows", [])
+    annual_exp = _annual_living_expense(cashflows)
+    if annual_exp <= 0:
+        return None
+    current_age = _family_age(family_data)
+    if current_age is None:
+        return None
+    annual_income = metrics.monthly_income(cashflows) * 12
+    pol = allocation.personalized_policy(
+        profile=family_data.get("family_profile"),
+        goals=family_data.get("goals"),
+        liabilities=liabilities,
+        cashflows=cashflows,
+    )
+    return projection.retirement_funding_ratio(
+        _asset_values(assets), _debts(liabilities), annual_income, annual_exp,
+        current_age, allocation=pol["target"])
 
 
 def _asset_values(assets) -> dict[str, float]:

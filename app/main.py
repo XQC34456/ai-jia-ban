@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import chat, db, decision, report
+from .api import goal, scenario, wealth
 
 
 def _load_dotenv() -> None:
@@ -40,6 +41,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(wealth.router)
+app.include_router(scenario.router)
+app.include_router(goal.router)
 
 
 class AuthIn(BaseModel):
@@ -70,20 +75,7 @@ def _ensure_table(table: str) -> None:
 
 
 # ---------- 鉴权 ----------
-
-def get_current_user(authorization: str | None = Header(default=None)) -> dict:
-    """从 Authorization: Bearer <token> 解析当前登录用户。"""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(401, "未登录")
-    user = db.get_user_by_token(authorization[7:])
-    if user is None:
-        raise HTTPException(401, "登录已失效，请重新登录")
-    return user
-
-
-def _require_vip(user: dict) -> None:
-    if user.get("tier") != "vip":
-        raise HTTPException(403, "深度报告和决策模拟是 VIP 专属功能，升级后即可使用")
+from .api.deps import get_current_user, require_vip as _require_vip  # noqa: E402
 
 
 @app.on_event("startup")
