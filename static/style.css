@@ -408,3 +408,93 @@ button { font-family: inherit; }
   .cmp-table { font-size: 12px; }
   .cmp-table th, .cmp-table td { padding: 8px 6px; }
 }
+
+/* ============================================================
+   AI 顾问（对话建档 + 决策模拟 + 深度报告）
+   ============================================================ */
+.chat-view { max-width: 880px; }
+.chat-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.chat-title h2 { font-size: 18px; margin: 0 0 4px; }
+.chat-title .lead { margin: 0; }
+.chat-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.chat-scroll { min-height: 340px; max-height: calc(100vh - 300px); overflow-y: auto; }
+.chat-empty { color: var(--muted); text-align: center; padding: 40px 20px; line-height: 1.8; }
+.chat-msg {
+  max-width: 78%; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word;
+}
+.chat-msg.user { align-self: flex-end; background: var(--brand); color: #fff; border-bottom-right-radius: 4px; }
+.chat-msg.bot  { align-self: flex-start; background: var(--bg-soft); color: var(--text); border-bottom-left-radius: 4px; }
+
+.chat-confirm {
+  align-self: flex-start; max-width: 82%; background: var(--brand-soft);
+  border: 1px solid var(--brand-line); border-radius: 12px; padding: 12px 14px;
+}
+.chat-confirm-text { font-size: 13px; margin-bottom: 8px; }
+.chat-confirm ul { margin: 0 0 10px; padding-left: 18px; font-size: 13px; }
+.chat-confirm-actions { display: flex; gap: 8px; align-items: center; }
+
+.chat-input-row { display: flex; gap: 10px; align-items: flex-end; }
+.chat-input {
+  flex: 1; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px;
+  font-family: inherit; background: var(--card); resize: vertical; min-height: 48px;
+}
+.chat-input:focus { outline: none; border-color: var(--brand); box-shadow: var(--focus-ring); }
+
+.btn-sm { padding: 6px 12px; font-size: 13px; }
+
+/* ---------- 弹窗 ---------- */
+.modal-mask {
+  position: fixed; inset: 0; z-index: 200; background: rgba(35, 32, 29, .42);
+  display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px;
+}
+.modal {
+  background: var(--card); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  width: 720px; max-width: 96vw; max-height: calc(100vh - 80px);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.modal-lg { width: 860px; }
+.modal-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.modal-title { font-size: 16px; font-weight: 700; }
+.modal-head-actions { display: flex; align-items: center; gap: 8px; }
+.modal-close { border: none; background: transparent; font-size: 18px; color: var(--muted); cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+.modal-close:hover { background: var(--bg-soft); color: var(--text); }
+.modal-body { padding: 20px; overflow-y: auto; }
+.modal-form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 16px; }
+
+/* ---------- 紧凑指标格（决策摘要 / 报告概览） ---------- */
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.stat { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.stat label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+.stat b { font-size: 16px; font-weight: 700; }
+.stat.hl { background: var(--brand-soft); border-color: var(--brand-line); }
+.stat.hl b { color: var(--brand-dark); }
+
+.decision-conclusion { margin-top: 14px; padding: 12px 14px; background: var(--brand-soft); border-radius: 10px; font-size: 14px; color: var(--brand-dark); }
+.cmp-table .hl-row td { background: var(--brand-soft); font-weight: 600; }
+.goal-need { font-size: 12px; color: var(--muted); }
+
+/* ---------- 深度报告 ---------- */
+.report-body { display: flex; flex-direction: column; gap: 14px; }
+.report-body h4 { font-size: 15px; margin-top: 6px; }
+.rp-meta { font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.rp-alloc { display: flex; flex-direction: column; gap: 8px; }
+.rp-problem { border-left: 3px solid var(--brand); padding: 8px 12px; background: var(--bg-soft); border-radius: 6px; font-size: 13px; }
+.rp-advice-line { color: var(--muted); margin-top: 4px; }
+.rp-advice h4 { font-size: 14px; margin-top: 6px; }
+.rp-advice ul { margin: 4px 0; padding-left: 18px; }
+.rp-advice p { margin: 6px 0; }
+.rp-disclaimer { font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; margin-top: 8px; }
+
+@media (max-width: 640px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .modal-form { grid-template-columns: 1fr; }
+}
+
+/* 打印：只保留报告内容 */
+@media print {
+  body * { visibility: hidden; }
+  .report-modal, .report-modal * { visibility: visible; }
+  .report-modal { position: absolute; inset: 0; width: 100%; max-width: none; max-height: none; box-shadow: none; border-radius: 0; }
+}
