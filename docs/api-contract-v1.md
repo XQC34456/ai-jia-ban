@@ -121,7 +121,16 @@ Family Data ──▶ Wealth Engine ──▶ Decision Layer ──▶ Services/
 ```
 
 ### 字段要点
-- `wealth_score`：0~100 整数；`wealth_level` ∈ 脆弱/谨慎/稳健/良好/卓越。
+- `wealth_score`：0~100 整数。
+- `wealth_level`：Wealth Engine 根据 `wealth_score` 生成的**确定性三档枚举**：
+
+| Wealth Level | 条件 |
+| ------------ | ---- |
+| **稳健**     | `score ≥ 75` |
+| **需关注**   | `50 ≤ score < 75` |
+| **脆弱**     | `score < 50` |
+
+> `wealth_level` 为 Wealth Engine 根据 `wealth_score` 生成的确定性枚举，API v1 当前仅支持「脆弱 / 需关注 / 稳健」三档；前端、AI Agent、报告层不得自行扩展或推导其他等级。
 - `asset_allocation.classes`：六大类（cash/fixed_income/equity/real_estate/alternative/other）占比，Σ≈1，ratio。
 - `allocation_target`：Σ=100% 的**点目标**（已按风险偏好/久期/DTI 归一化）。
 - `retirement`：**无年龄或无支出时整块为 `null`**。RFR（可投资资产口径）与 NWC（净资产口径）双指标，`quadrant` 四象限映射。
