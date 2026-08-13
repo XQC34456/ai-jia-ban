@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, model_validator
 
 __all__ = [
     "AGENT_INTENTS", "INTENT_TO_ENDPOINT", "INTENT_SUBFIELD", "SCENARIO_ALIASES",
-    "MetricRef", "AgentResponse",
+    "MetricRef", "AgentResponse", "AgentRequest",
 ]
 
 # ---------- ① 七意图冻结（A0） ----------
@@ -84,3 +84,9 @@ class AgentResponse(BaseModel):
     next_actions: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)   # 原样透传 known_limitations
     source: list[str] = Field(default_factory=list)
+
+
+class AgentRequest(BaseModel):
+    """Agent 自然语言请求体。message 必填（1~2000 字），context 供 EXPLAIN_RESULT 复用。"""
+    message: str = Field(min_length=1, max_length=2000)
+    context: dict | None = None

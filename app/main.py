@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import chat, db, decision, report
-from .api import goal, scenario, wealth
+from .api import agent, goal, scenario, wealth
 
 
 def _load_dotenv() -> None:
@@ -45,6 +45,7 @@ app.add_middleware(
 app.include_router(wealth.router)
 app.include_router(scenario.router)
 app.include_router(goal.router)
+app.include_router(agent.router)
 
 
 class AuthIn(BaseModel):
