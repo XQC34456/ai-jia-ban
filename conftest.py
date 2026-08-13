@@ -25,3 +25,9 @@ def auth_headers(client):
     r = client.post("/api/register", json={"username": "tester", "password": "secret123"})
     assert r.status_code == 200, r.text
     return {"Authorization": "Bearer " + r.json()["token"]}
+
+
+@pytest.fixture
+def family_id(client):
+    """创建一个空家庭并返回其 family_id（直接走 db 层，独立于鉴权）。"""
+    return db.create_family("测试家庭")
