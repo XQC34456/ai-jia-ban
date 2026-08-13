@@ -58,7 +58,7 @@ PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python -m pytest -q
 ```
 接入层       Web H5（static/，Vue 3 单页 App Shell + hash 路由，8 视图）
    ↓
-对话编排层   app/chat.py    抽取 → 确认 → 落地 → 重算 → 反馈（状态机）
+AI 顾问层   app/agent/    converse() 统一入口 → 建档吸收(确认卡片) / 七意图路由 → 结构化响应
    ↓
 抽取层       app/extraction.py  规则 / LLM(function calling) 可插拔
    ↓
@@ -84,14 +84,13 @@ PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python -m pytest -q
 | GET | `/api/me` | 当前用户信息 |
 | POST | `/api/upgrade` | 模拟开通 VIP（无支付，TODO 接支付） |
 | GET | `/api/family` | 家庭档案 + 快照 + 体检 |
-| POST | `/api/chat` | 对话，返回 confirm 或 answer |
-| POST | `/api/confirm` | 确认/撤销待定建档动作 |
+| POST | `/api/confirm` | 确认/撤销待定建档动作（配合 `/api/agent/chat` 的确认卡片） |
 | GET | `/api/wealth/overview` | 财富驾驶舱（评分/净资产/配置/现金流/养老/问题） |
 | GET | `/api/wealth/issues` | 问题/告警/优先级/建议 |
 | GET | `/api/wealth/goals` | 目标统一测算 |
 | POST | `/api/wealth/scenario/{name}` | 情景模拟（VIP） |
 | POST | `/api/wealth/scenario/{name}/compare` | 情景对比（VIP） |
-| POST | `/api/agent/chat` | AI Agent 自然语言入口（结构化 AgentResponse） |
+| POST | `/api/agent/chat` | AI 顾问唯一入口（建档确认卡片 / 七意图结构化 AgentResponse） |
 | GET | `/api/report` | 深度报告（VIP 专属） |
 | POST | `/api/decision` | 决策模拟（VIP 专属） |
 | POST | `/api/family/entity/{table}` | 看板新增实体 |
@@ -110,6 +109,8 @@ PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python -m pytest -q
 - 深度报告（LLM 建议 + 打印导出 PDF，VIP）
 - 决策模拟器（买房 / 提前还贷，VIP）
 - 登录 + VIP 分层（免费=对话建档 + 体检 + 目标 + 问题 + 各只读视图；VIP=报告 + 决策 + 情景沙盘；模拟开通按钮）
+- 家庭数据管理（成员/收入/支出/资产/负债/目标 的查看·新增·编辑·删除，纯读写不计算）
+- AI 顾问统一收口（`/api/chat` 退役；`/api/agent/chat` 唯一入口；建档确认吸收进 Agent；CHECK_ISSUES/CHECK_GOALS/EXPLAIN_RESULT 由 `build_issues`/`build_goals` 确定性产出，非 LLM 编造）
 
 ## 下一步（V2/V3）
 
