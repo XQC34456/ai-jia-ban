@@ -6,6 +6,10 @@ engine 内部继续用 dict（纯函数、零依赖），Schema 只负责 API �
 from .family import FamilyData
 from .issue import Issue, Recommendation
 from .goal import GoalOut
+from .agent import (
+    AGENT_INTENTS, INTENT_TO_ENDPOINT, INTENT_SUBFIELD, SCENARIO_ALIASES,
+    MetricRef, AgentResponse,
+)
 from .scenario import (
     SCENARIO_NAMES, SCENARIO_METRICS, SCENARIO_METRIC_KEYS, SCENARIO_PARAM_MODELS,
     ScenarioRequest, CompareOption, CompareRequest,
@@ -20,6 +24,8 @@ __all__ = [
     "FamilyData",
     "Issue", "Recommendation",
     "GoalOut",
+    "AGENT_INTENTS", "INTENT_TO_ENDPOINT", "INTENT_SUBFIELD", "SCENARIO_ALIASES",
+    "MetricRef", "AgentResponse",
     "SCENARIO_NAMES", "SCENARIO_METRICS", "SCENARIO_METRIC_KEYS", "SCENARIO_PARAM_MODELS",
     "ScenarioRequest", "CompareOption", "CompareRequest",
     "ComparisonMetric", "CompareOptionOverview", "CompareResponse",
