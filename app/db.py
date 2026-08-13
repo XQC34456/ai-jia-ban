@@ -133,12 +133,16 @@ def migrate() -> None:
     """幂等迁移：按 schema_version 递增执行。后续 V2 迁移在此按版本追加。"""
     conn = get_conn()
     try:
+        conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
         cur = conn.execute("SELECT value FROM meta WHERE key='schema_version'")
         row = cur.fetchone()
         version = int(row[0]) if row else 0
         if version < 1:
             _migrate_v1(conn)
             version = 1
+        if version < 2:
+            _migrate_v2(conn)
+            version = 2
         conn.execute(
             "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
             (str(version),),
@@ -176,6 +180,22 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
             "UPDATE asset SET asset_class = ? WHERE type = ? AND asset_class IS NULL",
             (new_class, old_type),
         )
+
+
+def _migrate_v2(conn: sqlite3.Connection) -> None:
+    """V2.0：goal 表新增现金流型目标字段（kind/年度金额/年限/起始年/优先级/风险容忍）。"""
+    for col, ddl in [
+        ("goal_kind", "TEXT"),
+        ("annual_amount", "REAL"),
+        ("duration_years", "INTEGER"),
+        ("start_year", "INTEGER"),
+        ("priority", "INTEGER"),
+        ("risk_tolerance", "TEXT"),
+    ]:
+        _add_column_if_missing(conn, "goal", col, ddl)
+    conn.execute("UPDATE goal SET goal_kind = 'lump_sum' WHERE goal_kind IS NULL")
+    conn.execute("UPDATE goal SET priority = 2 WHERE priority IS NULL")
+    conn.execute("UPDATE goal SET risk_tolerance = 'balanced' WHERE risk_tolerance IS NULL")
 
 
 def create_family(name: str = "我的家庭") -> int:
