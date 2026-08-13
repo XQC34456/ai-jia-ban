@@ -53,7 +53,7 @@ def test_free_user_blocked_from_vip_features(client):
 
     # 免费功能可用
     assert client.get("/api/family", headers=h).status_code == 200
-    assert client.post("/api/chat", headers=h,
+    assert client.post("/api/agent/chat", headers=h,
                        json={"message": "我月薪2万"}).status_code == 200
 
 

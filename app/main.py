@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import chat, db, decision, report
+from . import db, decision, report
 from .api import agent, goal, scenario, wealth
 from .agent.profile import apply_confirmation
 
@@ -52,10 +52,6 @@ app.include_router(agent.router)
 class AuthIn(BaseModel):
     username: str
     password: str
-
-
-class ChatIn(BaseModel):
-    message: str
 
 
 class ConfirmIn(BaseModel):
@@ -143,12 +139,6 @@ def get_family(user: dict = Depends(get_current_user)):
         "snapshot": ce.snapshot(data),
         "problems": health_check(data),
     }
-
-
-@app.post("/api/chat")
-def chat_endpoint(body: ChatIn, user: dict = Depends(get_current_user)):
-    """@deprecated：AI 顾问统一走 /api/agent/chat（converse）。前端迁移完成后（Task 7）退役。"""
-    return chat.handle_message(user["family_id"], body.message)
 
 
 @app.post("/api/confirm")
