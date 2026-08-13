@@ -6,7 +6,8 @@ def test_plan_cashflow_goal_zero_start():
     r = g.plan_cashflow_goal(100000, 4, 0, inflation=0.0, return_rate=0.0)
     assert r["fv_target"] == 400000
     assert r["gap"] == 400000
-    assert r["monthly_save"] == 400000  # 0 期，需一次性备齐
+    assert r["monthly_save"] is None          # 无积累期，无「每月定存」
+    assert r["immediate_shortfall"] == 400000  # 需立即一次性备齐
 
 
 def test_plan_cashflow_goal_with_years():
