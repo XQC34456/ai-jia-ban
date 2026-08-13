@@ -133,3 +133,6 @@ body {
 .issue-finding { font-size: 12px; color: var(--muted); }
 
 .empty-hint { color: var(--muted); font-size: 13px; padding: 8px 0; }
+
+.card-link { margin-top: auto; font-size: 13px; color: var(--brand); text-decoration: none; align-self: flex-end; }
+.card-link:hover { text-decoration: underline; }

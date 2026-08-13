@@ -104,6 +104,7 @@ const AllocationCard = {
           <span class="lbl">{{ c.label }}</span><b>{{ $pct(c.pct) }}</b>
         </div>
       </div>
+      <a href="/static/xray.html" class="card-link">查看配置 X-Ray →</a>
     </div>`,
 };
 
