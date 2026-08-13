@@ -1,6 +1,6 @@
 // 视图：AI 顾问（Phase 4 迁移 vanilla app.js 的「对话建档 + 决策模拟 + 深度报告」）。
 // 铁律：
-//   - 对话建档走 /api/chat → /api/confirm，决策走 /api/decision，报告走 /api/report；
+//   - 对话建档走 /api/agent/chat → /api/confirm，决策走 /api/decision，报告走 /api/report；
 //     本页只展示后端返回，不计算任何财富结论。
 //   - 建档落地（type=applied）后只「失效缓存」，由其它视图按需重拉（确保财富结论始终来自后端）。
 import { store, upgrade } from '../store.js';
@@ -107,11 +107,11 @@ export const ChatView = {
       sending.value = true; chatError.value = '';
       scrollChat();
       try {
-        const d = await api('/api/chat', { method: 'POST', body: { message: text }, token: store.auth.token });
+        const d = await api('/api/agent/chat', { method: 'POST', body: { message: text }, token: store.auth.token });
         if (d.type === 'confirm') {
           store.chat.messages.push({ type: 'confirm', pendingId: d.pending_id, message: d.message, items: d.items, resolved: false });
         } else {
-          store.chat.messages.push({ who: 'bot', text: d.message });
+          store.chat.messages.push({ who: 'bot', agent: d });
         }
       } catch (e) {
         chatError.value = e.message || '请求失败';
@@ -218,6 +218,17 @@ export const ChatView = {
       if (r.pct) return (Number(v) * 100).toFixed(1) + '%';
       return Number(v).toLocaleString('zh-CN');
     }
+    function fmtMetric(x) {
+      if (x.value == null) return '—';
+      switch (x.unit) {
+        case 'pct': return (Number(x.value) * 100).toFixed(1) + '%';
+        case 'months': return x.value + ' 个月';
+        case 'ratio': return Number(x.value).toFixed(2) + '×';
+        case 'score': return Number(x.value).toFixed(0) + ' 分';
+        case 'money': return fmtMoney(x.value);
+        default: return Number(x.value).toLocaleString('zh-CN');
+      }
+    }
     function summaryLabel(s) { return s.money ? fmtMoney(s.value) : String(s.value); }
 
     function printReport() { window.print(); }
@@ -229,7 +240,7 @@ export const ChatView = {
       openDecision, pickDecisionScenario, runDecision, doUpgrade,
       reportOpen, report, reportBusy, reportError, openReport, loadReport,
       reportAdvice, reportMembers, reportAllocation, reportGoals, reportProblems,
-      fmtMoney, fmtVal, summaryLabel, printReport,
+      fmtMoney, fmtVal, fmtMetric, summaryLabel, printReport,
     };
   },
   template: `
@@ -270,6 +281,22 @@ export const ChatView = {
               <button class="btn-ghost btn-sm" @click="confirm(m, false)">取消</button>
             </template>
             <span v-else class="muted">已处理</span>
+          </div>
+        </div>
+        <div v-else-if="m.agent" class="chat-agent">
+          <div class="agent-intent">{{ m.agent.summary }}</div>
+          <div v-if="m.agent.finding" class="agent-finding">{{ m.agent.finding }}</div>
+          <ul v-if="m.agent.metrics && m.agent.metrics.length" class="agent-metrics">
+            <li v-for="(x, i) in m.agent.metrics" :key="i">
+              <b>{{ x.label }}</b> {{ fmtMetric(x) }}
+              <span class="src" :title="x.source">{{ x.source }}</span>
+            </li>
+          </ul>
+          <ul v-if="m.agent.recommendations && m.agent.recommendations.length" class="agent-recs">
+            <li v-for="(r, i) in m.agent.recommendations" :key="i">{{ r }}</li>
+          </ul>
+          <div v-if="m.agent.next_actions && m.agent.next_actions.length" class="agent-next">
+            <span v-for="(a, i) in m.agent.next_actions" :key="i" class="chip">{{ a }}</span>
           </div>
         </div>
         <div v-else class="chat-msg" :class="m.who">{{ m.text }}</div>
