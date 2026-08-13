@@ -333,3 +333,78 @@ button { font-family: inherit; }
 .btn-link { display: inline-block; text-decoration: none; text-align: center; }
 .btn-link:hover { text-decoration: none; }
 .warn-note { background: var(--brand-soft); color: var(--brand-dark); padding: 8px 12px; border-radius: 8px; font-size: 13px; }
+
+/* ============================================================
+   情景沙盘（财富沙盘）
+   ============================================================ */
+.lead { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+
+/* 情景 tabs */
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.tab {
+  padding: 9px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--card);
+  cursor: pointer; font-size: 14px; color: var(--text);
+}
+.tab:hover { background: var(--bg-soft); }
+.tab.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+.desc { color: var(--muted); font-size: 13px; margin: 10px 0 16px; }
+
+/* 方案卡片 */
+.opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; align-items: start; }
+.opt-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px; }
+.opt-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.opt-tag { font-weight: 700; font-size: 15px; }
+.btn-mini { border: 1px solid var(--line); background: var(--card); border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--muted); padding: 3px 8px; }
+.btn-mini:hover { color: var(--warn); border-color: #fecaca; }
+.opt-fields { display: flex; flex-direction: column; gap: 10px; }
+.f-label { font-size: 12px; color: var(--muted); }
+.field select {
+  padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px;
+  font-family: inherit; background: var(--bg); transition: border-color .2s, box-shadow .2s;
+}
+.field select:focus { outline: none; border-color: var(--brand); box-shadow: var(--focus-ring); background: #fff; }
+.add-opt {
+  border: 1px dashed var(--line-strong); background: transparent; border-radius: var(--radius-lg); padding: 40px 16px;
+  cursor: pointer; font-size: 14px; color: var(--muted);
+}
+.add-opt:hover { border-color: var(--brand); color: var(--brand); }
+
+/* 操作与错误 */
+.actions { margin: 20px 0; }
+.actions .btn-primary { min-width: 180px; }
+.err-box {
+  background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 12px 14px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px;
+}
+.btn-upgrade { border: 1px solid var(--warn); background: var(--card); color: var(--warn); border-radius: 8px; cursor: pointer; font-size: 13px; padding: 6px 12px; flex-shrink: 0; }
+.btn-upgrade:hover { background: var(--warn-soft); }
+
+/* 结果 */
+.result { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 20px; margin-top: 8px; }
+.result-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.result-head h2 { margin: 0; font-size: 16px; }
+.baseline-chip { font-size: 13px; color: var(--muted); }
+
+.cmp-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.cmp-table th, .cmp-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.cmp-table thead th { text-align: left; color: var(--muted); font-weight: 600; font-size: 13px; }
+.cmp-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.cmp-table tbody tr:last-child td { border-bottom: none; }
+.metric { color: var(--muted); }
+.base { color: var(--text); font-weight: 600; }
+.val { font-weight: 600; }
+.delta { font-size: 12px; }
+.delta.pos { color: var(--score-good); }
+.delta.neg { color: var(--score-bad); }
+
+.foot-note { color: var(--muted); font-size: 12px; margin: 14px 0 0; }
+
+.limits-note { margin-top: 14px; padding: 12px 14px; background: var(--brand-soft); border-radius: 10px; }
+.limits-title { font-size: 13px; font-weight: 600; color: var(--brand-dark); margin-bottom: 6px; }
+.limits-note ul { margin: 0; padding-left: 18px; }
+.limits-note li { font-size: 12px; color: var(--brand-dark); }
+
+@media (max-width: 640px) {
+  .cmp-table { font-size: 12px; }
+  .cmp-table th, .cmp-table td { padding: 8px 6px; }
+}
