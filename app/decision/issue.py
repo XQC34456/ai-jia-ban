@@ -21,6 +21,14 @@ def build_issues(family_data: dict, ctx: dict | None = None) -> dict:
     issues = [det(family_data, ctx) for det in DETECTORS]
     issues = rank([i for i in issues if i is not None])
 
+    # 组装阶段统一补齐建议字段：recommendation_id / priority（继承 issue）/ current（继承 issue.metric）
+    for i in issues:
+        for idx, rec in enumerate(i.get("recommendations", []), start=1):
+            rec["recommendation_id"] = f"{i['issue_id']}-R{idx}"
+            rec["priority"] = i["severity"]
+            if not rec.get("current"):
+                rec["current"] = dict(i.get("metric", {}))
+
     alerts = [i["title"] for i in issues]
     priorities = [{"issue_id": i["issue_id"], "type": i["type"],
                    "severity": i["severity"], "title": i["title"]} for i in issues]

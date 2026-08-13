@@ -2,6 +2,9 @@
 
 每个检测器接收 family_data + 共享上下文 ctx，返回一个 Issue dict 或 None。
 只做「判断」，不计算任何财务数字（数字全部来自 Engine）；阈值与既有引擎一致。
+
+Recommendation.scenario 只引用 engine.scenario 已实现的情景名
+（buy_house / prepay / invest / income_change）；无对应情景的动作为 None（actionable=False）。
 """
 from __future__ import annotations
 
@@ -12,9 +15,26 @@ from .quadrant import retirement_quadrant
 __all__ = ["DETECTORS"]
 
 
-def _rec(action: str, detail: str, target: str | None = None) -> dict[str, Any]:
-    """动作化建议：只到资产类别/行为层，绝不推荐具体产品。"""
-    return {"action": action, "detail": detail, "target": target}
+def _rec(action: str, detail: str, *, reason: str = "", target: dict | None = None,
+         scenario: str | None = None) -> dict[str, Any]:
+    """动作化建议：只到资产类别/行为层，绝不推荐具体产品。
+
+    - target:   量化目标（数值），如 {"rfr": 1.0}
+    - scenario: 可触发的已实现情景名；None 表示暂无对应情景（actionable=False）
+    recommendation_id / priority / current 由 build_issues 组装时统一填充。
+    """
+    return {
+        "recommendation_id": "",
+        "action": action,
+        "detail": detail,
+        "reason": reason,
+        "priority": None,
+        "current": {},
+        "target": target or {},
+        "expected_effect": {},
+        "actionable": scenario is not None,
+        "scenario": scenario,
+    }
 
 
 # ---------- ① 现金流 ----------
@@ -35,7 +55,10 @@ def detect_cashflow(fd: dict, ctx: dict) -> dict | None:
             "metric": {"monthly_income": inc, "monthly_expense": snap["monthly_expense"],
                        "monthly_surplus": surplus},
             "target": {"monthly_surplus": "≥ 0"},
-            "recommendations": [_rec("削减非必要支出", "找出大额非必要支出，先把月度结余转正")],
+            "recommendations": [_rec(
+                "削减非必要支出", "找出大额非必要支出，先把月度结余转正",
+                reason="月度支出超过收入，结余为负",
+                target={"monthly_surplus": 0.0}, scenario="income_change")],
             "scenarios": ["income_change"],
         }
     if sr is not None and sr < 0.2:
@@ -46,7 +69,10 @@ def detect_cashflow(fd: dict, ctx: dict) -> dict | None:
             "reason": ["月度结余偏薄", "长期目标资金积累会偏慢"],
             "metric": {"savings_rate": round(sr, 3), "monthly_surplus": surplus},
             "target": {"savings_rate": "≥ 20%"},
-            "recommendations": [_rec("提升储蓄率", "逐步把储蓄率提升到 20% 以上，先自动转账再消费")],
+            "recommendations": [_rec(
+                "提升储蓄率", "逐步把储蓄率提升到 20% 以上，先自动转账再消费",
+                reason="月度结余偏薄，储蓄率低于 20% 健康线",
+                target={"savings_rate": 0.20}, scenario="income_change")],
             "scenarios": ["income_change"],
         }
     return None
@@ -60,10 +86,8 @@ def detect_liquidity(fd: dict, ctx: dict) -> dict | None:
         return None
     if em < 3:
         sev, title = "P0", "应急资金严重不足"
-        target = "≥ 6 个月"
     elif em < 6:
         sev, title = "P1", "应急资金偏低"
-        target = "≥ 6 个月"
     else:
         return None
     return {
@@ -72,9 +96,12 @@ def detect_liquidity(fd: dict, ctx: dict) -> dict | None:
         "finding": f"当前应急资金仅覆盖 {em:.1f} 个月支出",
         "reason": ["流动现金类资产不足", "低于 6 个月的安全线"],
         "metric": {"emergency_months": em},
-        "target": {"emergency_months": target},
-        "recommendations": [_rec("补足应急金", "优先补足 3~6 个月生活开支的应急金，放在活期/货币基金等随时可取账户")],
-        "scenarios": ["invest"],
+        "target": {"emergency_months": "≥ 6 个月"},
+        "recommendations": [_rec(
+            "补足应急金", "优先补足 3~6 个月生活开支的应急金，放在活期/货币基金等随时可取账户",
+            reason="流动现金类资产不足，低于 6 个月安全线",
+            target={"emergency_months": 6.0})],
+        "scenarios": [],
     }
 
 
@@ -110,7 +137,9 @@ def detect_debt(fd: dict, ctx: dict) -> dict | None:
         "target": {"dti": "≤ 30%"},
         "recommendations": [_rec(
             "优先降低负债" if prefer_debt else "控制杠杆",
-            "评估提前还贷或拉长期限，把月供压到收入 30% 以内" + ("；当前更应优先还贷而非追加投资" if prefer_debt else ""))],
+            "评估提前还贷或拉长期限，把月供压到收入 30% 以内" + ("；当前更应优先还贷而非追加投资" if prefer_debt else ""),
+            reason="月供占收入比例偏高，挤压储蓄与投资现金流",
+            target={"dti": 0.30}, scenario="prepay")],
         "scenarios": ["prepay"],
     }
 
@@ -131,9 +160,14 @@ def detect_allocation(fd: dict, ctx: dict) -> dict | None:
     if score >= 60:
         return None
     sev = "P0" if score < 30 else "P1"
-    recs = [_rec(_action_text(a), _detail_text(a)) for a in alloc["adjustments"][:2]]
+    recs = [_rec(_action_text(a), _detail_text(a),
+                 reason=f"配置适配度 {score} 分，偏离目标配置",
+                 target=_target_for(a), scenario="invest")
+            for a in alloc["adjustments"][:2]]
     if not recs:
-        recs = [_rec("调整资产配置", "按目标配置逐步增配低配大类、减配超配大类")]
+        recs = [_rec("调整资产配置", "按目标配置逐步增配低配大类、减配超配大类",
+                     reason=f"配置适配度 {score} 分，偏离目标配置",
+                     target={"allocation_fitness": 60}, scenario="invest")]
     return {
         "issue_id": "ALLOCATION_LOW_FITNESS_001", "type": "allocation", "severity": sev,
         "title": "资产配置适配度偏低",
@@ -160,6 +194,12 @@ def _detail_text(a: dict) -> str:
     return f"{cls_name}占比 {a['current_pct']*100:.0f}%，低于目标下限 {a['target_low']*100:.0f}%，未来新增资金优先补充该类"
 
 
+def _target_for(a: dict) -> dict:
+    """配置建议的量化目标：增配→目标下限，减配→目标上限（ratio）。"""
+    v = a["target_low"] if a["action"] == "增配" else a["target_high"]
+    return {a["asset_class"]: round(v, 3)}
+
+
 # ---------- ⑤ 养老 ----------
 
 def detect_retirement(fd: dict, ctx: dict) -> dict | None:
@@ -176,23 +216,32 @@ def detect_retirement(fd: dict, ctx: dict) -> dict | None:
         sev, title = "P0", "退休流动资金不足"
         finding = f"RFR 仅 {fr:.2f}，但 NWC 达 {nwc:.2f}"
         reason = ["房产等低流动性资产占比过高", "退休时可投资（金融）资产不足"]
-        recs = [_rec("增加金融资产", "未来新增资金优先配置现金/固收，降低新增资金进入房产的比例", f"RFR {fr:.2f} → ≥1.0")]
+        recs = [_rec("增加金融资产", "未来新增资金优先配置现金/固收，降低新增资金进入房产的比例",
+                     reason="房产等低流动性资产占比过高，退休可投资资产不足",
+                     target={"rfr": 1.0}, scenario="invest")]
+        scenarios = ["invest"]
     elif q == "养老资金不足":
         sev, title = "P0", "养老资金不足"
         finding = f"RFR {fr:.2f}、NWC {nwc:.2f}，均低于 1"
         reason = ["退休资金需求现值大于可动用资产", "净资产亦不足覆盖退休生活"]
-        recs = [_rec("加大养老储备", "提升储蓄率并增加长期权益/固收积累，提高退休可投资资产", f"RFR {fr:.2f} → ≥1.0")]
+        recs = [_rec("加大养老储备", "提升储蓄率并增加长期权益/固收积累，提高退休可投资资产",
+                     reason="退休资金需求现值大于可动用资产",
+                     target={"rfr": 1.0}, scenario="invest")]
+        scenarios = ["invest"]
     else:  # 高杠杆/资产结构问题
         sev, title = "P1", "高杠杆资产结构问题"
         finding = f"RFR {fr:.2f} 达标，但 NWC 仅 {nwc:.2f}"
         reason = ["净资产口径覆盖不足，可能存在未清负债拖累"]
-        recs = [_rec("降低负债", "优先降低负债，改善净资产对退休需求的覆盖")]
+        recs = [_rec("降低负债", "优先降低负债，改善净资产对退休需求的覆盖",
+                     reason="净资产口径覆盖不足，可能有未清负债拖累",
+                     target={"nwc": 1.0}, scenario="prepay")]
+        scenarios = ["prepay"]
     return {
         "issue_id": "RETIREMENT_LIQUIDITY_001", "type": "retirement", "severity": sev,
         "title": title, "finding": finding, "reason": reason,
         "metric": metric, "target": {"rfr": 1.0},
         "recommendations": recs,
-        "scenarios": ["invest", "allocation_rebalance"],
+        "scenarios": scenarios,
     }
 
 
@@ -215,7 +264,11 @@ def detect_goals(fd: dict, ctx: dict) -> dict | None:
                        "monthly_surplus": funding["monthly_surplus"],
                        "shortfall": funding["shortfall"]},
             "target": {"monthly_surplus": "≥ total_monthly_needed"},
-            "recommendations": [_rec("评估目标优先级", "评估各目标优先级，或延长期限、下调金额，避免挤压日常现金流")],
+            "recommendations": [_rec(
+                "评估目标优先级", "评估各目标优先级，或延长期限、下调金额，避免挤压日常现金流",
+                reason="目标合计所需储蓄超出家庭月结余",
+                target={"monthly_surplus": funding["total_monthly_needed"]},
+                scenario="income_change")],
             "scenarios": ["income_change"],
         }
     # 无资金竞争问题，但个别目标存在缺口 → 提示最大缺口
@@ -230,7 +283,10 @@ def detect_goals(fd: dict, ctx: dict) -> dict | None:
             "metric": {"goal": g["name"], "gap": g["gap"],
                        "monthly_needed": g.get("monthly_needed")},
             "target": {"gap": 0},
-            "recommendations": [_rec("设定定存计划", "设定每月定存金额，让目标进度可跟踪")],
+            "recommendations": [_rec(
+                "设定定存计划", "设定每月定存金额，让目标进度可跟踪",
+                reason="当前已备资金不足以覆盖目标金额",
+                target={"gap": 0})],
             "scenarios": [],
         }
     return None
@@ -254,7 +310,10 @@ def detect_decision(fd: dict, ctx: dict) -> dict | None:
         "reason": ["大量现金长期闲置", "未充分发挥复利积累"],
         "metric": {"emergency_months": em},
         "target": {"emergency_months": "6~12 个月"},
-        "recommendations": [_rec("配置闲置现金", "保留 6~12 个月应急金后，将多余现金按目标配置投入固收/权益")],
+        "recommendations": [_rec(
+            "配置闲置现金", "保留 6~12 个月应急金后，将多余现金按目标配置投入固收/权益",
+            reason="大量现金长期闲置，未发挥复利积累",
+            target={"emergency_months": 12.0}, scenario="invest")],
         "scenarios": ["invest"],
     }
 

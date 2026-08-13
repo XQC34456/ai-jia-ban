@@ -21,4 +21,9 @@ def run_scenario_endpoint(name: str, body: ScenarioRequest, user: dict = Depends
         raise HTTPException(400, f"未知场景: {name}")
     data = db.dump_family(user["family_id"])
     snap = metrics.snapshot(data)
-    return sc.run_scenario(data, snap, name, body.params)
+    result = sc.run_scenario(data, snap, name, body.params)
+    # 统一错误契约：engine 的内联校验错误（如「请填写房价」）转成 HTTP 400，
+    # 与其它 4xx 一样走 {"detail": "..."} 结构，前端无需区分两种错误形态。
+    if "error" in result:
+        raise HTTPException(400, result["error"])
+    return result

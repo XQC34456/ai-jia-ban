@@ -52,6 +52,7 @@ class RetirementBlock(BaseModel):
 
 class Overview(BaseModel):
     """家庭财富总览：一次返回驾驶舱所需核心状态。"""
+    currency: str = "CNY"             # 货币单位：所有金额字段均为人民币（元）
     wealth_score: int = 0
     wealth_level: str = "脆弱"
     net_worth: float = 0.0

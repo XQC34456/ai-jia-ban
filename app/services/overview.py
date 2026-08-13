@@ -39,6 +39,7 @@ def build_overview(family_data: dict) -> dict:
     decision = build_issues(family_data, ctx)
 
     return {
+        "currency": "CNY",
         "wealth_score": ws["score"],
         "wealth_level": ws["level"],
         "net_worth": snap["net_worth"],
