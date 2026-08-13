@@ -11,12 +11,23 @@ from typing import Any
 from . import allocation, metrics
 
 __all__ = [
-    "SCENARIOS", "run_scenario",
+    "SCENARIOS", "run_scenario", "ASSET_CLASS_PROFILE",
     "monthly_payment", "remaining_principal", "months_to_clear",
     "simulate_buy_house", "simulate_prepay", "simulate_invest", "simulate_income_change",
 ]
 
 _LIQUID = metrics.LIQUID_ASSET_TYPES
+
+# 大类默认假设：中性年化收益 + 年化波动率（B 端可覆盖，非硬编码建议值）。
+# 三情景终值 = amount × (1 + return)^horizon，悲观/乐观 = return ∓ volatility。
+ASSET_CLASS_PROFILE = {
+    "cash":         {"return": 0.015, "volatility": 0.00},
+    "fixed_income": {"return": 0.030, "volatility": 0.02},
+    "equity":       {"return": 0.080, "volatility": 0.20},
+    "real_estate":  {"return": 0.050, "volatility": 0.10},
+    "alternative":  {"return": 0.070, "volatility": 0.25},
+    "other":        {"return": 0.030, "volatility": 0.15},
+}
 
 
 # ---------- 等额本息公式 ----------
@@ -94,12 +105,34 @@ def simulate_buy_house(data: dict[str, Any], snap: dict[str, Any], p: dict[str, 
     rem_loan = remaining_principal(loan, loan_rate, loan_years, horizon * 12)
     net_b = float(snap["net_worth"] or 0) + (house_final - price) + (loan - rem_loan) + surplus_b * 12 * horizon
 
-    exp_a = float(snap["monthly_expense"] or 0)
-    exp_b = exp_a - current_rent + payment
+    # ---- 7 项多维影响 ----
+    net_diff = net_b - net_a
+
+    # 原资产结构（用于金融资产 / 房产占比变化）
+    breakdown = allocation.asset_class_breakdown(data.get("assets", []))
+    fin_before = breakdown["cash"]["value"] + breakdown["fixed_income"]["value"] + breakdown["equity"]["value"]
+    re_before = breakdown["real_estate"]["value"]
+    total_assets = float(snap["total_assets"] or 0)
+    total_assets_after = total_assets - down + price  # = 原总资产 + 贷款（净资产买房瞬间不变）
+    fin_diff = -down                                     # 首付从金融/流动现金转入房产
+    re_pct_before = re_before / total_assets if total_assets > 0 else 0.0
+    re_pct_after = (re_before + price) / total_assets_after if total_assets_after > 0 else 0.0
+
+    exp_b = float(snap["monthly_expense"] or 0) - current_rent + payment
     em_a = snap["emergency_months"]
     em_b = round((liquid - down) / exp_b, 1) if (exp_b > 0 and liquid - down > 0) else None
+    cashflow_diff = surplus_b - surplus_a            # = 租金抵扣 - 月供
 
-    net_diff = net_b - net_a
+    monthly_income = float(snap["monthly_income"] or 0)
+    current_debt = sum(float(l.get("monthly_payment") or 0) for l in data.get("liabilities", []))
+    dti_a = metrics.debt_to_income(data.get("liabilities", []), data.get("cashflows", []))
+    dti_b = (current_debt + payment) / monthly_income if monthly_income > 0 else None
+
+    gf = snap.get("goals_funding", {})
+    need = float(gf.get("total_monthly_needed") or 0)
+    feasible_b = surplus_b >= need
+    goal_note = _goal_funding_note(need, feasible_b, surplus_b)
+
     return {
         "scenario": "buy_house",
         "title": "买房决策",
@@ -109,6 +142,23 @@ def simulate_buy_house(data: dict[str, Any], snap: dict[str, Any], p: dict[str, 
             {"label": "首付", "value": round(down, 2), "money": True},
             {"label": "月供", "value": round(payment, 2), "money": True},
             {"label": "当前租金", "value": round(current_rent, 2), "money": True},
+        ],
+        "impacts": [
+            {"key": "net_worth", "label": "净资产变化",
+             "before": round(net_a, 2), "after": round(net_b, 2), "delta": round(net_diff, 2), "money": True},
+            {"key": "financial_assets", "label": "金融资产变化",
+             "delta": round(fin_diff, 2), "money": True, "note": "首付由流动金融资产转入房产"},
+            {"key": "liquidity", "label": "流动性变化",
+             "before": em_a, "after": em_b, "months": True, "note": "应急资金覆盖月数"},
+            {"key": "monthly_cashflow", "label": "月度现金流变化",
+             "before": round(surplus_a, 2), "after": round(surplus_b, 2),
+             "delta": round(cashflow_diff, 2), "money": True},
+            {"key": "debt_ratio", "label": "负债率变化",
+             "before": round(dti_a, 4) if dti_a is not None else None,
+             "after": round(dti_b, 4) if dti_b is not None else None, "pct": True},
+            {"key": "real_estate_pct", "label": "房产占比",
+             "before": round(re_pct_before, 4), "after": round(re_pct_after, 4), "pct": True},
+            {"key": "goal_funding", "label": "目标资金影响", "note": goal_note},
         ],
         "rows": [
             {"label": f"{horizon} 年后净资产", "a": round(net_a, 2), "b": round(net_b, 2), "money": True, "highlight": True},
@@ -120,6 +170,15 @@ def simulate_buy_house(data: dict[str, Any], snap: dict[str, Any], p: dict[str, 
                             "loan_years": loan_years, "house_growth": house_growth,
                             "current_rent": current_rent, "horizon_years": horizon},
     }
+
+
+def _goal_funding_note(need: float, feasible_b: bool, surplus_b: float) -> str:
+    """目标资金影响：买房后月结余是否仍覆盖目标月定存。"""
+    if need <= 0:
+        return "未设定需要月定存的理财目标，无目标资金挤占"
+    if feasible_b:
+        return f"买房后月结余 {surplus_b:,.0f} 元 ≥ 目标月需 {need:,.0f} 元，目标定存仍可行"
+    return f"买房后月结余 {surplus_b:,.0f} 元 < 目标月需 {need:,.0f} 元，目标定存将被挤占"
 
 
 def _buy_conclusion(horizon: int, net_diff: float, surplus_b: float) -> str:
@@ -215,13 +274,18 @@ def simulate_invest(data: dict[str, Any], snap: dict[str, Any], p: dict[str, Any
     if amount <= 0:
         return {"scenario": "invest", "title": "投资配置", "error": "请填写投资金额"}
 
+    profile = ASSET_CLASS_PROFILE.get(to_class, ASSET_CLASS_PROFILE["other"])
+    return_rate = _rate(p.get("return_rate")) if p.get("return_rate") not in (None, "", 0) else profile["return"]
+    volatility = _rate(p.get("volatility")) if p.get("volatility") not in (None, "", 0) else profile["volatility"]
+    horizon = int(p.get("horizon_years") or 5)
+
     liquid = sum(float(a.get("value") or 0) for a in data.get("assets", []) if a.get("type") in _LIQUID)
     if amount > liquid:
         return {"scenario": "invest", "title": "投资配置",
                 "error": f"投资金额 {amount:,.0f} 元超过可用流动现金 {liquid:,.0f} 元，无法执行"}
-    total = snap["total_assets"]
+
+    total = float(snap["total_assets"] or 0)
     current = allocation.asset_class_breakdown(data.get("assets", []))
-    # 方案 B：流动现金减少 amount，目标大类增加 amount
     after = {k: dict(v) for k, v in current.items()}
     after["cash"]["value"] -= amount
     after[to_class]["value"] += amount
@@ -230,7 +294,17 @@ def simulate_invest(data: dict[str, Any], snap: dict[str, Any], p: dict[str, Any
 
     liquid_after = max(liquid - amount, 0.0)
     exp = metrics.monthly_expense(data.get("cashflows", []), data.get("liabilities", []))
+    em_a = snap["emergency_months"]
     em_after = round(liquid_after / exp, 1) if exp > 0 else None
+
+    # ---- 三情景终值（确定性，非 Monte Carlo）----
+    def _fv(r: float) -> float:
+        return amount * (1 + max(r, -0.5)) ** horizon
+    neutral = _fv(return_rate)
+    pessimistic = _fv(return_rate - volatility)
+    optimistic = _fv(return_rate + volatility)
+
+    goal_note = _invest_goal_note(data, amount, liquid_after, horizon)
 
     return {
         "scenario": "invest",
@@ -241,24 +315,62 @@ def simulate_invest(data: dict[str, Any], snap: dict[str, Any], p: dict[str, Any
             {"label": "投资金额", "value": round(amount, 2), "money": True},
             {"label": "目标大类", "value": to_class},
         ],
+        "impacts": [
+            {"key": "amount", "label": "投入金额", "value": round(amount, 2), "money": True},
+            {"key": "source", "label": "资金来源", "note": f"流动现金（当前 {liquid:,.0f} 元，存款/货币基金等）"},
+            {"key": "asset_class", "label": "资产类别", "note": to_class},
+            {"key": "return_rate", "label": "假设收益率", "value": round(return_rate, 4), "pct": True},
+            {"key": "volatility", "label": "风险/波动", "value": round(volatility, 4), "pct": True,
+             "note": "年化波动率，用于悲观/乐观情景"},
+            {"key": "horizon", "label": "时间", "value": horizon, "note": "年"},
+            {"key": "final_asset", "label": "最终资产（三情景）",
+             "neutral": round(neutral, 2), "pessimistic": round(pessimistic, 2),
+             "optimistic": round(optimistic, 2), "money": True},
+            {"key": "cashflow", "label": "现金流影响",
+             "note": "一次性资产配置，不改变月度结余（无新增月度现金流）"},
+            {"key": "goal_completion", "label": "目标完成度变化", "note": goal_note},
+            {"key": "liquidity", "label": "流动性变化",
+             "before": em_a, "after": em_after, "months": True},
+        ],
         "rows": [
             {"label": "流动现金", "a": round(liquid, 2), "b": round(liquid_after, 2), "money": True},
             {"label": f"{to_class} 占比", "a": round(current[to_class]["pct"] * 100, 1),
              "b": round(after[to_class]["pct"] * 100, 1)},
-            {"label": "应急资金（月）", "a": snap["emergency_months"], "b": em_after, "months": True},
+            {"label": "应急资金（月）", "a": em_a, "b": em_after, "months": True},
         ],
-        "conclusion": _invest_conclusion(amount, to_class, liquid_after, em_after),
-        "params_snapshot": {"amount": amount, "to_class": to_class},
+        "conclusion": _invest_conclusion(amount, to_class, return_rate, horizon, neutral, pessimistic, optimistic, em_after),
+        "params_snapshot": {"amount": amount, "to_class": to_class, "return_rate": return_rate,
+                            "volatility": volatility, "horizon_years": horizon},
     }
 
 
-def _invest_conclusion(amount: float, to_class: str, liquid_after: float, em_after: float | None) -> str:
-    parts = [f"将 {amount:,.0f} 元投入 {to_class} 后，流动现金降至 {liquid_after:,.0f} 元"]
-    if em_after is not None:
-        parts.append(f"应急资金覆盖约 {em_after} 个月")
-        if em_after < 3:
-            parts.append("低于 3 个月安全线，建议保留足够应急金再投资")
-    return "；".join(parts) + "。以上为简化测算，未计入交易费用及税费，仅供参考。"
+def _invest_goal_note(data: dict[str, Any], amount: float, liquid_after: float, horizon: int) -> str:
+    """目标完成度变化：投资占用的现金是否挤占 horizon 内到期的目标资金缺口。"""
+    goals = data.get("goals", [])
+    if not goals:
+        return "未设定理财目标，无目标资金占用"
+    short_gap = 0.0
+    for g in goals:
+        if g.get("goal_kind") == "cashflow":
+            continue
+        gap = max(float(g.get("target_amount") or 0) - float(g.get("current_saved") or 0), 0.0)
+        months = metrics._months_until(g.get("target_date"))
+        if months is not None and months <= horizon * 12 and gap > 0:
+            short_gap += gap
+    if short_gap > 0 and short_gap > liquid_after:
+        return (f"horizon 内目标资金缺口 {short_gap:,.0f} 元超过投资后流动现金 {liquid_after:,.0f} 元，"
+                f"目标资金被占用，建议预留后再投资")
+    return "投资后流动现金仍可覆盖 horizon 内目标资金缺口，目标完成度不受影响"
+
+
+def _invest_conclusion(amount: float, to_class: str, return_rate: float, horizon: int,
+                       neutral: float, pessimistic: float, optimistic: float, em_after: float | None) -> str:
+    parts = [f"将 {amount:,.0f} 元投入 {to_class}（中性年化 {return_rate*100:.1f}%），"
+             f"{horizon} 年后中性情景预计 {neutral:,.0f} 元"]
+    parts.append(f"悲观 {pessimistic:,.0f} 元 / 乐观 {optimistic:,.0f} 元")
+    if em_after is not None and em_after < 3:
+        parts.append("投资后应急资金低于 3 个月安全线，建议保留足够应急金再投资")
+    return "；".join(parts) + "。以上为确定性测算，未计入交易费用、税费及通胀，仅供参考。"
 
 
 # ---------- 场景：收入变化 ----------
