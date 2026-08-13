@@ -147,19 +147,22 @@ def _goals_dim(family_data):
 
 
 def _retirement_dim(family_data):
-    """养老准备：基于 Projection 的 Retirement Funding Ratio。
+    """养老准备：基于 Projection 的 Retirement Funding Ratio（可投资资产口径）。
 
-    有年龄信息时用确定性投影算「退休时净资产 / 退休后需求现值」；
+    有年龄信息时用资产层确定性投影算「退休可投资资产 / 退休需求现值」（RFR），
+    同时给出「退休净资产 / 退休需求现值」（NWC）；默认自住房产不计入可投资资产。
     无年龄信息时回退 4% 法则（仅作辅助启发式，明确标注）。
     """
-    nw = metrics.net_worth(family_data.get("assets", []), family_data.get("liabilities", []))
-    annual_exp = metrics.monthly_expense(family_data.get("cashflows", []),
-                                         family_data.get("liabilities", [])) * 12
+    assets = family_data.get("assets", [])
+    liabilities = family_data.get("liabilities", [])
+    cashflows = family_data.get("cashflows", [])
+    annual_exp = _annual_living_expense(cashflows)
     if annual_exp <= 0:
         return {"name": "retirement", "score": 40, "reasons": ["尚未记录支出，无法评估养老准备"]}
 
     current_age = _family_age(family_data)
     if current_age is None:
+        nw = metrics.net_worth(assets, liabilities)
         ratio = nw / (annual_exp * 25)
         score = min(100.0, ratio * 100)
         reasons = [f"按 4% 法则（辅助启发式），净资产约为年支出的 {ratio*25:.1f} 倍（目标 25 倍）"]
@@ -167,13 +170,64 @@ def _retirement_dim(family_data):
             reasons.append("距 25 倍年支出的养老目标仍有差距")
         return {"name": "retirement", "score": round(score), "reasons": reasons}
 
-    annual_income = metrics.monthly_income(family_data.get("cashflows", [])) * 12
-    rfr = projection.retirement_funding_ratio(nw, annual_income, annual_exp, current_age)
-    reasons = [f"退休({rfr['retirement_age']}岁)时预计净资产 {rfr['net_worth_at_retirement']:,.0f} 元，"
-               f"退休后资金需求现值 {rfr['retirement_need_pv']:,.0f} 元，资金覆盖比 {rfr['funding_ratio']:.2f}"]
-    if rfr["funding_ratio"] is not None and rfr["funding_ratio"] < 1:
-        reasons.append("退休资金覆盖比低于 1，养老资金不足")
+    annual_income = metrics.monthly_income(cashflows) * 12
+    pol = allocation.personalized_policy(
+        profile=family_data.get("family_profile"),
+        goals=family_data.get("goals"),
+        liabilities=liabilities,
+        cashflows=cashflows,
+    )
+    rfr = projection.retirement_funding_ratio(
+        _asset_values(assets), _debts(liabilities), annual_income, annual_exp,
+        current_age, allocation=pol["target"])
+    reasons = [f"退休({rfr['retirement_age']}岁)时可投资资产 {rfr['investable_at_retirement']:,.0f} 元，"
+               f"退休后资金需求现值 {rfr['retirement_need_pv']:,.0f} 元，"
+               f"资金覆盖比(RFR) {rfr['funding_ratio']:.2f}，净资产覆盖比(NWC) {rfr['net_worth_coverage']:.2f}"]
+    fr = rfr["funding_ratio"]
+    nwc = rfr["net_worth_coverage"]
+    if fr is not None and fr < 1:
+        if nwc is not None and nwc >= 1:
+            reasons.append("净资产充足但可投资资产不足：资产结构偏重房产等低流动性资产，退休流动资金紧张")
+        else:
+            reasons.append("退休资金覆盖比低于 1，养老资金不足")
     return {"name": "retirement", "score": rfr["score"], "reasons": reasons}
+
+
+def _asset_values(assets) -> dict[str, float]:
+    """六大类资产金额（供资产层投影使用）。"""
+    b = allocation.asset_class_breakdown(assets)
+    return {cls: b[cls]["value"] for cls in allocation.ASSET_CLASSES}
+
+
+def _debts(liabilities) -> list[dict[str, Any]]:
+    """负债 → 摊销型债务列表 {principal, annual_rate, remaining_months}。
+
+    利率 >1 视为百分数归一化；缺 remaining_months 时由月供反推还清月数。
+    """
+    from . import scenario
+    out = []
+    for l in liabilities or []:
+        principal = float(l.get("principal") or 0)
+        if principal <= 0:
+            continue
+        rate = float(l.get("interest_rate") or 0)
+        rate = rate / 100.0 if rate > 1 else rate
+        months = int(l.get("remaining_months") or 0)
+        if months <= 0:
+            pay = float(l.get("monthly_payment") or 0)
+            months = scenario.months_to_clear(principal, rate, pay) if pay > 0 else 0
+        out.append({"principal": principal, "annual_rate": rate, "remaining_months": months})
+    return out
+
+
+def _annual_living_expense(cashflows) -> float:
+    """年生活支出（仅支出型现金流，不含负债月供；负债在投影中单独摊销）。"""
+    total = 0.0
+    for c in cashflows or []:
+        if c.get("flow_type") == "expense":
+            amount = float(c.get("amount") or 0)
+            total += amount / 12.0 if c.get("period") == "年" else amount
+    return total * 12
 
 
 def _family_age(family_data) -> int | None:

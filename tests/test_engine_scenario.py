@@ -74,9 +74,10 @@ def test_buy_house_has_seven_impacts():
 
 
 def test_invest_three_scenarios_monotonic():
-    # 中性应介于悲观与乐观之间
+    # 基准情景应介于保守与积极之间（确定性压力测试，非概率分布）
     r = sc.run_scenario(_data(), _snap(_data()), "invest",
                         {"amount": 300000, "to_class": "equity", "return_rate": 0.08,
                          "volatility": 0.2, "horizon_years": 10})
     fa = next(i for i in r["impacts"] if i["key"] == "final_asset")
-    assert fa["pessimistic"] < fa["neutral"] < fa["optimistic"]
+    assert fa["conservative"] < fa["base"] < fa["optimistic"]
+    assert "P10/P50/P90" in fa["note"]

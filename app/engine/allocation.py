@@ -1,7 +1,11 @@
-"""Wealth Engine · 资产配置分析：大类占比 / 集中度 / 目标区间 Policy / 偏离与调整。
+"""Wealth Engine · 资产配置分析：大类占比 / 集中度 / 目标 Policy / 偏离与调整。
 
-Asset Class 采用可配置映射（ASSET_CLASS_MAP），目标区间采用 Policy 数据结构，
-B 端可注入覆盖，绝不硬编码比例。
+核心原则：
+- 目标配置只覆盖「可配置金融资产」cash / fixed_income / equity 三个大类；
+  房产 / 另类 / 其他不进入目标区间，通过 concentration 与 liquidity 单独评估。
+- 每个风险画像的区间必须「可行」（Σ 下限 ≤ 100% ≤ Σ 上限），并能归一化出
+  一个 Σ = 100% 的点目标（point target），保证 Policy 在数学上完整。
+- 期限修正只在 equity 与 fixed_income 之间转移（不碰 cash），绝不破坏 Σ。
 """
 from __future__ import annotations
 
@@ -10,13 +14,17 @@ from typing import Any
 from . import metrics
 
 __all__ = [
-    "ASSET_CLASSES", "ASSET_CLASS_MAP", "DEFAULT_POLICY",
+    "ASSET_CLASSES", "ASSET_CLASS_MAP", "DEFAULT_POLICY", "FINANCIAL_TARGET_CLASSES",
     "classify_asset", "asset_class_breakdown", "concentration",
     "allocation_policy", "personalized_policy", "allocation_fitness", "analyze",
+    "_normalize_target", "_financial_breakdown",
 ]
 
 # 六大资产大类（可扩展枚举）
 ASSET_CLASSES = ("cash", "fixed_income", "equity", "real_estate", "alternative", "other")
+
+# 进入目标区间、参与 Σ=100% 归一化的可配置金融资产
+FINANCIAL_TARGET_CLASSES = ("cash", "fixed_income", "equity")
 
 # 资产类型 → 大类映射（可配置；记录上的 asset_class 字段优先，此表作兜底回填）
 ASSET_CLASS_MAP = {
@@ -25,12 +33,12 @@ ASSET_CLASS_MAP = {
     "债券": "fixed_income", "股票": "equity", "保险现金价值": "other", "其他": "other",
 }
 
-# 默认目标配置区间（Policy 数据结构，B 端可注入覆盖；只覆盖可配置的金融资产，
-# 房产/另类通过 concentration 单独评估，不给硬编码区间）
+# 默认目标配置区间（Policy 数据结构，B 端可注入覆盖）。
+# 区间必须可行：Σ 下限 ≤ 1 且 Σ 上限 ≥ 1，才能归一化出 Σ=100% 的点目标。
 DEFAULT_POLICY = {
-    "conservative": {"cash": [0.10, 0.20], "fixed_income": [0.35, 0.55], "equity": [0.05, 0.20]},
-    "balanced":     {"cash": [0.05, 0.15], "fixed_income": [0.20, 0.40], "equity": [0.20, 0.45]},
-    "aggressive":   {"cash": [0.02, 0.10], "fixed_income": [0.10, 0.30], "equity": [0.40, 0.70]},
+    "conservative": {"cash": [0.20, 0.30], "fixed_income": [0.50, 0.65], "equity": [0.05, 0.20]},
+    "balanced":     {"cash": [0.10, 0.20], "fixed_income": [0.40, 0.55], "equity": [0.25, 0.40]},
+    "aggressive":   {"cash": [0.03, 0.10], "fixed_income": [0.20, 0.35], "equity": [0.55, 0.75]},
 }
 
 
@@ -80,31 +88,117 @@ def concentration(assets: list[dict[str, Any]]) -> dict[str, float]:
 
 
 def allocation_policy(risk_profile: str, time_horizon: int, policy: dict | None = None) -> dict:
-    """目标配置区间：由风险画像 + 期限动态决定（Policy 可注入，非硬编码）。"""
+    """目标配置区间：由风险画像 + 期限动态决定（Policy 可注入，非硬编码）。
+
+    期限修正只在 equity ↔ fixed_income 之间转移（越短越保守：权益↓固收↑），
+    现金区间不动，保证修正后区间仍可行（Σ 不变）。
+    """
     source = policy or DEFAULT_POLICY
     base = source.get(risk_profile, source.get("balanced", {}))
-    # 期限修正：越短越偏保守，越长越偏进取
-    adj = -0.10 if time_horizon <= 3 else (0.10 if time_horizon > 7 else 0.0)
-    return {k: [max(0.0, lo + adj), min(1.0, hi + adj)] for k, (lo, hi) in base.items()}
+    out = {k: [float(lo), float(hi)] for k, (lo, hi) in base.items()}
+
+    if time_horizon <= 3:
+        shift = -0.10
+    elif time_horizon > 7:
+        shift = 0.10
+    else:
+        shift = 0.0
+
+    if shift and "equity" in out and "fixed_income" in out:
+        eq_lo, eq_hi = out["equity"]
+        fi_lo, fi_hi = out["fixed_income"]
+        out["equity"] = [max(0.0, eq_lo + shift), max(0.0, eq_hi + shift)]
+        out["fixed_income"] = [max(0.0, fi_lo - shift), max(0.0, fi_hi - shift)]
+    return out
 
 
-def _deviation(current: dict, target: dict) -> dict[str, str]:
+def _normalize_target(ranges: dict) -> dict[str, float]:
+    """由可行区间 [lo, hi] 生成 Σ=100% 的点目标，且保证 lo ≤ target ≤ hi。
+
+    统一归一化规则：取区间中点为初值 → 归一化到 100% → 逐项夹紧到区间 →
+    夹紧产生的残差在未到边界的项之间按剩余可调空间比例再分配，迭代至收敛。
+    区间不可行（Σlo>1 或 Σhi<1）时退化为「按区间宽度加权」的最优逼近。
+    """
+    keys = [k for k in FINANCIAL_TARGET_CLASSES if k in ranges]
+    if not keys:
+        return {}
+    lo = {k: max(0.0, float(ranges[k][0])) for k in keys}
+    hi = {k: min(1.0, float(ranges[k][1])) for k in keys}
+    target = {k: (lo[k] + hi[k]) / 2 for k in keys}
+
+    for _ in range(100):
+        total = sum(target.values())
+        if total <= 0:
+            target = {k: 1.0 / len(keys) for k in keys}
+            break
+        for k in keys:  # 归一化到 100%
+            target[k] /= total
+        clipped = {k: min(max(target[k], lo[k]), hi[k]) for k in keys}
+        residual = 1.0 - sum(clipped.values())
+        if abs(residual) < 1e-6:
+            target = clipped
+            break
+        free = [k for k in keys if lo[k] < clipped[k] < hi[k]]
+        if not free:
+            target = clipped
+            break
+        if residual > 0:
+            slack = sum(hi[k] - clipped[k] for k in free)
+        else:
+            slack = sum(clipped[k] - lo[k] for k in free)
+        if slack <= 0:
+            target = clipped
+            break
+        for k in free:
+            if residual > 0:
+                target[k] = clipped[k] + residual * (hi[k] - clipped[k]) / slack
+            else:
+                target[k] = clipped[k] + residual * (clipped[k] - lo[k]) / slack
+        for k in keys:
+            if k not in free:
+                target[k] = clipped[k]
+
+    return {k: round(target[k], 4) for k in keys}
+
+
+def _financial_breakdown(breakdown: dict[str, dict[str, float]]) -> dict[str, float]:
+    """金融资产口径占比：cash/fixed_income/equity 在「金融资产合计」中的占比。
+
+    分母 = cash + fixed_income + equity 的金额（房产/另类/其他不进入分母）。
+    """
+    denom = sum(breakdown[cls]["value"] for cls in FINANCIAL_TARGET_CLASSES)
+    if denom <= 0:
+        return {cls: 0.0 for cls in FINANCIAL_TARGET_CLASSES} | {"denom": 0.0}
+    out = {cls: round(breakdown[cls]["value"] / denom, 4) for cls in FINANCIAL_TARGET_CLASSES}
+    out["denom"] = round(denom, 2)
+    return out
+
+
+def _deviation(financial_pct: dict, target_range: dict) -> dict[str, str]:
+    """金融资产口径相对目标区间：below / in_range / above。"""
     out = {}
-    for cls, (lo, hi) in target.items():
-        pct = current.get(cls, {}).get("pct", 0.0)
+    for cls in FINANCIAL_TARGET_CLASSES:
+        if cls not in target_range:
+            continue
+        lo, hi = target_range[cls]
+        pct = financial_pct.get(cls, 0.0)
         out[cls] = "below" if pct < lo else ("above" if pct > hi else "in_range")
     return out
 
 
-def _adjustments(current: dict, target: dict) -> list[dict[str, Any]]:
+def _adjustments(financial_pct: dict, target_range: dict) -> list[dict[str, Any]]:
+    """金融资产口径的增配/减配建议（相对目标区间）。"""
     adv = []
-    for cls, (lo, hi) in target.items():
-        pct = current.get(cls, {}).get("pct", 0.0)
+    for cls in FINANCIAL_TARGET_CLASSES:
+        if cls not in target_range:
+            continue
+        lo, hi = target_range[cls]
+        pct = financial_pct.get(cls, 0.0)
         if pct < lo:
-            adv.append({"asset_class": cls, "action": "增配", "current_pct": pct,
+            adv.append({"asset_class": cls, "action": "增配", "current_pct": round(pct, 4),
                         "target_low": lo, "gap_pct": round(lo - pct, 4)})
         elif pct > hi:
-            adv.append({"asset_class": cls, "action": "减配", "current_pct": pct,
+            adv.append({"asset_class": cls, "action": "减配", "current_pct": round(pct, 4),
                         "target_high": hi, "gap_pct": round(pct - hi, 4)})
     adv.sort(key=lambda x: x["gap_pct"], reverse=True)
     return adv
@@ -125,42 +219,52 @@ def _liquidity(assets, cashflows, liabilities):
 
 
 def analyze(assets, profile=None, cashflows=None, liabilities=None) -> dict:
-    """资产配置综合分析（设计 G1 的输出结构）。"""
+    """资产配置综合分析（设计 G1 的输出结构）。
+
+    返回：current（6 大类总资产口径）、financial_pct（金融资产口径）、
+    concentration、liquidity、target（Σ=100% 点目标）、target_range（区间）、
+    deviation（金融口径 vs 区间）、adjustments。
+    """
     profile = profile or {}
     current = asset_class_breakdown(assets)
+    financial_pct = _financial_breakdown(current)
     risk_profile = profile.get("risk_profile", "balanced")
     horizon = profile.get("investment_horizon", 10)
-    target = allocation_policy(risk_profile, horizon)
+    target_range = allocation_policy(risk_profile, horizon)
     return {
         "current": current,
+        "financial_pct": {k: v for k, v in financial_pct.items() if k != "denom"},
+        "financial_denom": financial_pct.get("denom", 0.0),
         "concentration": concentration(assets),
         "liquidity": _liquidity(assets, cashflows, liabilities),
-        "target_range": target,
-        "deviation": _deviation(current, target),
-        "adjustments": _adjustments(current, target),
+        "target": _normalize_target(target_range),
+        "target_range": target_range,
+        "deviation": _deviation(financial_pct, target_range),
+        "adjustments": _adjustments(financial_pct, target_range),
     }
 
 
 def personalized_policy(profile=None, goals=None, liabilities=None, cashflows=None, policy=None) -> dict:
-    """家庭专属目标配置区间：基础 Policy + 目标期限/负债修正。
+    """家庭专属目标配置：基础 Policy + 目标期限/负债修正，输出 Σ=100% 点目标 + 区间。
 
-    房产/另类不进入区间（由 concentration 单独评估），只对可配置的
-    金融资产（cash/fixed_income/equity）做个性化调整。
+    房产/另类不进入目标（由 concentration 单独评估），只对可配置金融资产
+    （cash/fixed_income/equity）做个性化调整；修正后经 _normalize_target 保证
+    数学完整（Σ=100% 且 lo ≤ target ≤ hi）。
     """
     profile = profile or {}
-    target = allocation_policy(profile.get("risk_profile", "balanced"),
-                               profile.get("investment_horizon", 10), policy)
-    target = {k: list(v) for k, v in target.items()}
+    rng = allocation_policy(profile.get("risk_profile", "balanced"),
+                            profile.get("investment_horizon", 10), policy)
+    rng = {k: list(v) for k, v in rng.items()}
     reasons = []
     if _has_short_term_goal(goals):
-        target["cash"][0] = max(0.0, target["cash"][0] + 0.05)
-        target["equity"][1] = max(0.0, target["equity"][1] - 0.10)
+        rng["cash"][0] = min(rng["cash"][0] + 0.05, rng["cash"][1])
+        rng["equity"][1] = max(rng["equity"][0], rng["equity"][1] - 0.10)
         reasons.append("存在 3 年内用款目标，提高现金下限、压降权益上限")
     dti = metrics.debt_to_income(liabilities or [], cashflows or [])
     if dti is not None and dti > 0.5:
-        target["equity"][1] = max(0.0, target["equity"][1] - 0.10)
+        rng["equity"][1] = max(rng["equity"][0], rng["equity"][1] - 0.10)
         reasons.append("负债压力偏高（DTI>50%），压降权益上限")
-    return {"target": target, "reasons": reasons}
+    return {"target": _normalize_target(rng), "range": rng, "reasons": reasons}
 
 
 def _has_short_term_goal(goals) -> bool:
@@ -182,25 +286,27 @@ def allocation_fitness(assets, profile=None, cashflows=None, liabilities=None, g
     """Allocation Fitness Score：目标约束下的配置适配度（100 分制，可解释）。
 
     Fitness = 100 - 偏离惩罚(≤40) - 集中度惩罚(≤30) - 流动性惩罚(≤30)。
-    每项有明确公式与 reasons，评分可逐项追溯，不是黑箱。
+    偏离惩罚用「金融资产口径占比 vs Σ=100% 点目标」的绝对距离，
+    每偏离 1% 扣 1 分；集中度/流动性惩罚保持不变。
     """
     current = asset_class_breakdown(assets)
+    financial_pct = _financial_breakdown(current)
     pol = personalized_policy(profile, goals, liabilities, cashflows)
     target = pol["target"]
+    target_range = pol["range"]
     reasons = list(pol["reasons"])
 
-    # 1. 偏离惩罚：金融资产相对目标区间，每偏离 1% 扣 1 分（上限 40）
+    # 1. 偏离惩罚：金融资产占比 vs 点目标（距离 × 100，上限 40）
     deviation_penalty = 0.0
-    for cls in ("cash", "fixed_income", "equity"):
-        pct = current[cls]["pct"]
-        lo, hi = target[cls]
-        if pct < lo:
-            deviation_penalty += (lo - pct) * 100
-            reasons.append(f"{cls} 占比 {pct*100:.0f}% 低于目标下限 {lo*100:.0f}%")
-        elif pct > hi:
-            deviation_penalty += (pct - hi) * 100
-            reasons.append(f"{cls} 占比 {pct*100:.0f}% 高于目标上限 {hi*100:.0f}%")
-    deviation_penalty = min(deviation_penalty, 40.0)
+    if financial_pct.get("denom", 0.0) <= 0:
+        deviation_penalty = 40.0
+        reasons.append("无现金/固收/权益等可配置金融资产，无法形成有效配置")
+    else:
+        for cls in FINANCIAL_TARGET_CLASSES:
+            pct = financial_pct[cls]
+            tgt = target.get(cls, 0.0)
+            deviation_penalty += abs(pct - tgt) * 100
+        deviation_penalty = min(deviation_penalty, 40.0)
 
     # 2. 集中度惩罚：房产/股票/未分类资产过重（上限 30）
     conc = concentration(assets)
@@ -228,8 +334,10 @@ def allocation_fitness(assets, profile=None, cashflows=None, liabilities=None, g
     return {
         "score": round(score),
         "target": target,
+        "target_range": target_range,
         "current": current,
-        "deviation": _deviation(current, target),
+        "financial_pct": {k: v for k, v in financial_pct.items() if k != "denom"},
+        "deviation": _deviation(financial_pct, target_range),
         "concentration": conc,
         "liquidity": liq,
         "penalties": {

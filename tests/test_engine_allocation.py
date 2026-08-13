@@ -51,19 +51,33 @@ def test_policy_custom_injectable():
 
 
 def test_analyze_deviation_and_concentration():
+    # 金融资产口径：现金占金融资产 100%（房产不计入金融分母）→ 超配
     assets = [{"type": "房产", "value": 9000000}, {"type": "存款", "value": 1000000}]
     r = al.analyze(assets, profile={"risk_profile": "balanced", "investment_horizon": 10})
-    assert r["deviation"]["cash"] == "below"
+    assert r["deviation"]["cash"] == "above"
     assert r["concentration"]["real_estate_pct"] > 0.7
-    assert any(a["action"] == "增配" for a in r["adjustments"])
+    assert any(a["action"] == "减配" for a in r["adjustments"])
+    assert abs(sum(r["target"].values()) - 1.0) < 0.001  # 点目标 Σ=100%
+
+
+def test_policy_target_sums_to_one():
+    # 三个风险画像 + 期限修正后，点目标必须 Σ=100% 且落在区间内
+    for risk in ("conservative", "balanced", "aggressive"):
+        for horizon in (2, 5, 10, 20):
+            rng = al.allocation_policy(risk, horizon)
+            target = al._normalize_target(rng)
+            assert abs(sum(target.values()) - 1.0) < 0.001, f"{risk}/{horizon} Σ={sum(target.values())}"
+            for cls in ("cash", "fixed_income", "equity"):
+                lo, hi = rng[cls]
+                assert lo - 1e-6 <= target[cls] <= hi + 1e-6, f"{risk}/{horizon}/{cls} 越界"
 
 
 def test_allocation_fitness_rewards_diversified():
-    # 现金10/固收30/股票30/房产30 → 金融资产在 balanced 区间内，房产不超 50%
+    # 金融资产口径（现金14.3/固收42.9/股票42.9）接近 balanced 点目标，房产 30% 不超限
     assets = [{"type": "存款", "value": 100000}, {"type": "基金", "value": 300000},
               {"type": "股票", "value": 300000}, {"type": "房产", "value": 300000}]
     fit = al.allocation_fitness(assets)
-    assert fit["score"] > 80  # 唯一扣分来自单股 30% 的轻微集中度惩罚(5分)
+    assert fit["score"] > 80  # 轻微偏离 + 单股 30% 集中度惩罚，仍高分
 
 
 def test_allocation_fitness_penalizes_concentration():
@@ -86,17 +100,19 @@ def test_allocation_fitness_penalizes_other():
 
 
 def test_personalized_policy_short_term_goal():
-    # 3 年内用款目标 → 提高现金下限、压降权益上限
+    # 3 年内用款目标 → 提高现金、压降权益（点目标比较）
     goals = [{"goal_kind": "cashflow", "annual_amount": 500000, "duration_years": 2, "start_year": 2}]
-    pol = al.personalized_policy(None, goals)["target"]
-    base = al.allocation_policy("balanced", 10)
-    assert pol["cash"][0] > base["cash"][0]
-    assert pol["equity"][1] < base["equity"][1]
+    pol = al.personalized_policy(None, goals)
+    base_point = al._normalize_target(al.allocation_policy("balanced", 10))
+    assert pol["target"]["cash"] > base_point["cash"]
+    assert pol["target"]["equity"] < base_point["equity"]
+    assert abs(sum(pol["target"].values()) - 1.0) < 0.001
 
 
 def test_personalized_policy_high_debt():
     liab = [{"type": "房贷", "monthly_payment": 30000}]
     cf = [{"flow_type": "income", "amount": 50000, "period": "月"}]
-    pol = al.personalized_policy(None, None, liab, cf)["target"]
-    base = al.allocation_policy("balanced", 10)
-    assert pol["equity"][1] < base["equity"][1]  # DTI=0.6 > 0.5 压降权益上限
+    pol = al.personalized_policy(None, None, liab, cf)
+    base_point = al._normalize_target(al.allocation_policy("balanced", 10))
+    assert pol["target"]["equity"] < base_point["equity"]  # DTI=0.6 > 0.5 压降权益上限
+    assert abs(sum(pol["target"].values()) - 1.0) < 0.001

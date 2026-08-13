@@ -18,8 +18,9 @@ __all__ = [
 
 _LIQUID = metrics.LIQUID_ASSET_TYPES
 
-# 大类默认假设：中性年化收益 + 年化波动率（B 端可覆盖，非硬编码建议值）。
-# 三情景终值 = amount × (1 + return)^horizon，悲观/乐观 = return ∓ volatility。
+# 大类默认假设：基准年化收益 + 年化波动率（B 端可覆盖，非硬编码建议值）。
+# 三情景终值 = amount × (1 + return)^horizon，保守/积极 = return ∓ volatility。
+# 三情景为「确定性情景压力测试」，不代表概率预测，也不等同于 P10/P50/P90。
 ASSET_CLASS_PROFILE = {
     "cash":         {"return": 0.015, "volatility": 0.00},
     "fixed_income": {"return": 0.030, "volatility": 0.02},
@@ -297,11 +298,11 @@ def simulate_invest(data: dict[str, Any], snap: dict[str, Any], p: dict[str, Any
     em_a = snap["emergency_months"]
     em_after = round(liquid_after / exp, 1) if exp > 0 else None
 
-    # ---- 三情景终值（确定性，非 Monte Carlo）----
+    # ---- 三情景终值（确定性压力测试，非 Monte Carlo，非 P10/P50/P90）----
     def _fv(r: float) -> float:
         return amount * (1 + max(r, -0.5)) ** horizon
-    neutral = _fv(return_rate)
-    pessimistic = _fv(return_rate - volatility)
+    base = _fv(return_rate)
+    conservative = _fv(return_rate - volatility)
     optimistic = _fv(return_rate + volatility)
 
     goal_note = _invest_goal_note(data, amount, liquid_after, horizon)
@@ -321,11 +322,12 @@ def simulate_invest(data: dict[str, Any], snap: dict[str, Any], p: dict[str, Any
             {"key": "asset_class", "label": "资产类别", "note": to_class},
             {"key": "return_rate", "label": "假设收益率", "value": round(return_rate, 4), "pct": True},
             {"key": "volatility", "label": "风险/波动", "value": round(volatility, 4), "pct": True,
-             "note": "年化波动率，用于悲观/乐观情景"},
+             "note": "年化波动率，用于保守/积极情景"},
             {"key": "horizon", "label": "时间", "value": horizon, "note": "年"},
             {"key": "final_asset", "label": "最终资产（三情景）",
-             "neutral": round(neutral, 2), "pessimistic": round(pessimistic, 2),
-             "optimistic": round(optimistic, 2), "money": True},
+             "conservative": round(conservative, 2), "base": round(base, 2),
+             "optimistic": round(optimistic, 2), "money": True,
+             "note": "确定性情景压力测试，不代表概率预测，也不等同于 P10/P50/P90"},
             {"key": "cashflow", "label": "现金流影响",
              "note": "一次性资产配置，不改变月度结余（无新增月度现金流）"},
             {"key": "goal_completion", "label": "目标完成度变化", "note": goal_note},
@@ -338,7 +340,7 @@ def simulate_invest(data: dict[str, Any], snap: dict[str, Any], p: dict[str, Any
              "b": round(after[to_class]["pct"] * 100, 1)},
             {"label": "应急资金（月）", "a": em_a, "b": em_after, "months": True},
         ],
-        "conclusion": _invest_conclusion(amount, to_class, return_rate, horizon, neutral, pessimistic, optimistic, em_after),
+        "conclusion": _invest_conclusion(amount, to_class, return_rate, horizon, base, conservative, optimistic, em_after),
         "params_snapshot": {"amount": amount, "to_class": to_class, "return_rate": return_rate,
                             "volatility": volatility, "horizon_years": horizon},
     }
@@ -364,13 +366,14 @@ def _invest_goal_note(data: dict[str, Any], amount: float, liquid_after: float, 
 
 
 def _invest_conclusion(amount: float, to_class: str, return_rate: float, horizon: int,
-                       neutral: float, pessimistic: float, optimistic: float, em_after: float | None) -> str:
-    parts = [f"将 {amount:,.0f} 元投入 {to_class}（中性年化 {return_rate*100:.1f}%），"
-             f"{horizon} 年后中性情景预计 {neutral:,.0f} 元"]
-    parts.append(f"悲观 {pessimistic:,.0f} 元 / 乐观 {optimistic:,.0f} 元")
+                       base: float, conservative: float, optimistic: float, em_after: float | None) -> str:
+    parts = [f"将 {amount:,.0f} 元投入 {to_class}（基准年化 {return_rate*100:.1f}%），"
+             f"{horizon} 年后基准情景预计 {base:,.0f} 元"]
+    parts.append(f"保守情景 {conservative:,.0f} 元 / 积极情景 {optimistic:,.0f} 元")
     if em_after is not None and em_after < 3:
         parts.append("投资后应急资金低于 3 个月安全线，建议保留足够应急金再投资")
-    return "；".join(parts) + "。以上为确定性测算，未计入交易费用、税费及通胀，仅供参考。"
+    return ("；".join(parts) + "。三情景为确定性压力测试，不代表概率预测，"
+            "也不等同于 P10/P50/P90；未计入交易费用、税费及通胀，仅供参考。")
 
 
 # ---------- 场景：收入变化 ----------
