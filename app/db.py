@@ -100,6 +100,11 @@ CREATE TABLE IF NOT EXISTS reminder (
     status TEXT DEFAULT '待处理',
     FOREIGN KEY(family_id) REFERENCES family(id)
 );
+
+CREATE TABLE IF NOT EXISTS meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 
@@ -118,6 +123,24 @@ def init_db() -> None:
     conn = get_conn()
     try:
         conn.executescript(SCHEMA)
+        conn.commit()
+    finally:
+        conn.close()
+    migrate()
+
+
+def migrate() -> None:
+    """幂等迁移：按 schema_version 递增执行。后续 V2 迁移在此按版本追加。"""
+    conn = get_conn()
+    try:
+        cur = conn.execute("SELECT value FROM meta WHERE key='schema_version'")
+        row = cur.fetchone()
+        version = int(row[0]) if row else 0
+        # V2 迁移序列在此按 version 递增追加（见 _migrate_v1 / _migrate_v2 / _migrate_v3）
+        conn.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
+            (str(version),),
+        )
         conn.commit()
     finally:
         conn.close()
