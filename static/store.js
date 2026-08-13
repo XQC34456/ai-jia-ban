@@ -1,14 +1,33 @@
-// 前端单一事实源：Vue reactive 单例。
-// overview 只来自 /api/wealth/overview；任何派生 computed 只做展示，绝不产生财富结论。
+// 前端单一事实源：Vue reactive 单例，按「切片」模块化组织。
+// 铁律：
+//   - overview 只来自 /api/wealth/overview；goals / issues / sandbox / chat 各有独立切片与端点，
+//     不把所有数据硬塞进 overview。
+//   - 任何派生 computed 只做展示（格式化/排序/筛选/着色），绝不产生财富结论。
+//   - 向后兼容：store.auth / store.overview / store.loading / store.error 保留给未迁移的
+//     cockpit/sandbox/xray 使用（迁移完成后统一收进各自切片）。
 import { api } from './api.js';
 
 const { reactive, computed } = Vue;
 
 export const store = reactive({
   auth: { token: localStorage.getItem('token') || null, username: '', tier: 'free' },
-  overview: null,      // 全量驾驶舱状态（唯一数据源）
+
+  // —— 切片：驾驶舱核心（唯一财富事实源；loading/error 为向后兼容别名）——
+  overview: null,
   loading: false,
   error: null,
+
+  // —— 切片：家庭目标（独立端点，lazy load）——
+  goals: { data: null, loading: false, error: null },
+
+  // —— 切片：风险问题（独立端点，lazy load）——
+  issues: { data: null, loading: false, error: null },
+
+  // —— 切片：情景沙盘（单次模拟 + 多方案对比）——
+  sandbox: { result: null, comparison: null, loading: false, error: null },
+
+  // —— 切片：AI 顾问对话（Phase 4 迁移 vanilla chat 后启用）——
+  chat: { messages: [], loading: false, error: null },
 });
 
 function applySession(r) {
@@ -35,6 +54,11 @@ export function logout() {
   store.auth.username = '';
   store.auth.tier = 'free';
   store.overview = null;
+  store.goals.data = null;
+  store.issues.data = null;
+  store.sandbox.result = null;
+  store.sandbox.comparison = null;
+  store.chat.messages = [];
   localStorage.removeItem('token');
 }
 
@@ -49,6 +73,38 @@ export async function loadOverview() {
     throw e;
   } finally {
     store.loading = false;
+  }
+}
+
+export async function upgrade() {
+  const r = await api('/api/upgrade', { method: 'POST', token: store.auth.token });
+  store.auth.tier = r.tier || 'vip';
+  return r;
+}
+
+export async function loadGoals() {
+  store.goals.loading = true;
+  store.goals.error = null;
+  try {
+    store.goals.data = await api('/api/wealth/goals', { token: store.auth.token });
+  } catch (e) {
+    store.goals.error = e.message;
+    throw e;
+  } finally {
+    store.goals.loading = false;
+  }
+}
+
+export async function loadIssues() {
+  store.issues.loading = true;
+  store.issues.error = null;
+  try {
+    store.issues.data = await api('/api/wealth/issues', { token: store.auth.token });
+  } catch (e) {
+    store.issues.error = e.message;
+    throw e;
+  } finally {
+    store.issues.loading = false;
   }
 }
 

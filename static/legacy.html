@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI家办 · 家庭财富智管家（旧版）</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>" />
+  <link rel="stylesheet" href="/static/legacy.css" />
+</head>
+<body>
+  <!-- 登录/注册遮罩 -->
+  <div class="auth-mask" id="authMask">
+    <div class="auth-card">
+      <div class="auth-title"><span class="brand-logo">🏠</span>AI家办 <span>家庭财富智管家</span></div>
+      <div class="auth-sub" id="authSub">登录后开始管理你的家庭财富</div>
+      <div class="auth-error" id="authError" hidden></div>
+      <label class="auth-label">用户名<input id="authUser" placeholder="字母/数字/中文" autocomplete="username"></label>
+      <label class="auth-label">密码<input id="authPass" type="password" placeholder="至少 6 位" autocomplete="current-password"></label>
+      <button class="auth-submit" id="authSubmit">登 录</button>
+      <div class="auth-switch">还没有账号？<a id="authToggle">免费注册</a></div>
+    </div>
+  </div>
+
+  <header class="topbar">
+    <div class="brand"><span class="brand-logo">🏠</span>AI家办 <span>家庭财富智管家 · MVP</span></div>
+    <div class="topbar-right">
+      <span id="userBox"></span>
+      <a href="/static/cockpit.html" class="btn-report cockpit-link">🏠 财富驾驶舱</a>
+      <button id="decisionBtn" class="btn-report">⚖️ 决策模拟</button>
+      <button id="reportBtn" class="btn-report">📄 生成报告</button>
+      <span id="llmBadge">AI 引擎：检测中…</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- 对话区 -->
+    <section class="chat-panel">
+      <div class="chat-head">对话 · AI家庭财富顾问</div>
+      <div class="chat-body" id="chatBody">
+        <div class="msg bot">
+          你好，我是你的家庭财富顾问。<br/>
+          直接告诉我你的情况，比如：<br/>
+          <span class="eg">“我月薪2万，老婆1万5”</span><br/>
+          <span class="eg">“房贷月供8000”</span><br/>
+          <span class="eg">“存款50万，孩子12岁”</span><br/>
+          <span class="eg">“我家现在最大的风险是什么？”</span>
+        </div>
+      </div>
+      <div class="chat-input">
+        <textarea id="msgInput" rows="2" placeholder="说说你的家庭财务情况…"></textarea>
+        <button id="sendBtn">发送</button>
+      </div>
+    </section>
+
+    <!-- 看板区 -->
+    <aside class="side-panel">
+      <div class="side-head">家庭财富档案</div>
+      <nav class="tabs" id="tabs">
+        <button class="tab active" data-tab="overview">总览</button>
+        <button class="tab" data-tab="assets">资产</button>
+        <button class="tab" data-tab="liabilities">负债</button>
+        <button class="tab" data-tab="cashflow">现金流</button>
+        <button class="tab" data-tab="persons">成员</button>
+        <button class="tab" data-tab="goals">目标</button>
+      </nav>
+      <div class="side-body">
+        <section class="tab-pane active" id="pane-overview"></section>
+        <section class="tab-pane" id="pane-assets"></section>
+        <section class="tab-pane" id="pane-liabilities"></section>
+        <section class="tab-pane" id="pane-cashflow"></section>
+        <section class="tab-pane" id="pane-persons"></section>
+        <section class="tab-pane" id="pane-goals"></section>
+      </div>
+    </aside>
+  </main>
+
+  <!-- 新增/编辑弹窗 -->
+  <div class="modal-mask" id="modalMask" hidden>
+    <div class="modal">
+      <div class="modal-head"><span id="modalTitle">新增</span><button class="modal-close" id="modalClose">×</button></div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-foot">
+        <button class="btn-ghost" id="modalCancel">取消</button>
+        <button class="btn-ok" id="modalSave">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 升级引导 -->
+  <div class="modal-mask" id="upgradeMask" hidden>
+    <div class="modal">
+      <div class="modal-head"><span>🔒 升级 VIP</span><button class="modal-close" id="upgradeClose">×</button></div>
+      <div class="modal-body">
+        <p class="upgrade-tip">深度报告和决策模拟是 VIP 专属功能。</p>
+        <p class="upgrade-tip">免费版包含：AI 对话咨询 · 基础健康体检 · 家庭数据看板。</p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-ghost" id="upgradeCancel">暂不</button>
+        <button class="btn-ok" id="upgradeOk">立即开通 VIP</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 深度报告 -->
+  <div class="report-mask" id="reportMask" hidden>
+    <div class="report">
+      <div class="report-bar">
+        <div class="report-title" id="reportTitle">家庭财富报告</div>
+        <div class="report-actions">
+          <button class="btn-ghost no-print" id="reportPrint">🖨 导出 PDF</button>
+          <button class="btn-ghost no-print" id="reportClose">关闭</button>
+        </div>
+      </div>
+      <div class="report-body" id="reportBody"></div>
+    </div>
+  </div>
+
+  <!-- 决策模拟器 -->
+  <div class="decision-mask" id="decisionMask" hidden>
+    <div class="decision">
+      <div class="decision-bar">
+        <div class="decision-title">⚖️ 决策模拟器</div>
+        <button class="btn-ghost no-print" id="decisionClose">关闭</button>
+      </div>
+      <div class="decision-body">
+        <label>决策场景
+          <select id="decisionScenario">
+            <option value="buy_house">买房</option>
+            <option value="prepay">提前还贷</option>
+          </select>
+        </label>
+        <div class="decision-form" id="decisionForm"></div>
+        <button class="btn-ok" id="decisionRun">开始模拟</button>
+        <div id="decisionResult"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
