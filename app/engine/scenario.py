@@ -82,6 +82,9 @@ def simulate_buy_house(data: dict[str, Any], snap: dict[str, Any], p: dict[str, 
     payment = monthly_payment(loan, loan_rate, loan_years)
 
     liquid = sum(float(a.get("value") or 0) for a in data.get("assets", []) if a.get("type") in _LIQUID)
+    if down > liquid:
+        return {"scenario": "buy_house", "title": "买房决策",
+                "error": f"首付 {down:,.0f} 元超过可用流动现金 {liquid:,.0f} 元，无法完成交易"}
 
     surplus_a = float(snap["monthly_surplus"] or 0)
     net_a = float(snap["net_worth"] or 0) + surplus_a * 12 * horizon
@@ -213,6 +216,9 @@ def simulate_invest(data: dict[str, Any], snap: dict[str, Any], p: dict[str, Any
         return {"scenario": "invest", "title": "投资配置", "error": "请填写投资金额"}
 
     liquid = sum(float(a.get("value") or 0) for a in data.get("assets", []) if a.get("type") in _LIQUID)
+    if amount > liquid:
+        return {"scenario": "invest", "title": "投资配置",
+                "error": f"投资金额 {amount:,.0f} 元超过可用流动现金 {liquid:,.0f} 元，无法执行"}
     total = snap["total_assets"]
     current = allocation.asset_class_breakdown(data.get("assets", []))
     # 方案 B：流动现金减少 amount，目标大类增加 amount

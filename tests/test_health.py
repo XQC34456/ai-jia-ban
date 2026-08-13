@@ -34,3 +34,15 @@ def test_house_concentration_problem():
     }
     problems = health_check(data)
     assert any("房产" in p["title"] for p in problems)
+
+
+def test_negative_cashflow_detected_without_income():
+    """无收入但有支出（在吃老本）应被识别为现金流为负，不能因 savings_rate=None 漏报。"""
+    data = {
+        "assets": [{"type": "存款", "value": 300000}],
+        "liabilities": [],
+        "cashflows": [{"flow_type": "expense", "amount": 10000, "period": "月"}],
+        "goals": [],
+    }
+    problems = health_check(data)
+    assert any("现金流" in p["title"] for p in problems)

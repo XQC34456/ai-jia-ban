@@ -59,7 +59,8 @@ def health_check(family_data: dict[str, Any]) -> list[dict[str, Any]]:
         })
 
     # 3. 储蓄率过低 / 现金流为负
-    if sr is not None and sr < 0:
+    surplus = ce.monthly_surplus(cashflows, liabilities)
+    if surplus < 0:
         problems.append({
             "severity": 5,
             "title": "家庭现金流为负",

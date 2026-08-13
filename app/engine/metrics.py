@@ -106,6 +106,8 @@ def _months_until(target_date: str | None, today: date | None = None) -> int | N
 
 
 def goal_gap(goal: dict[str, Any], today: date | None = None) -> dict[str, Any]:
+    if goal.get("goal_kind") == "cashflow":
+        return _cashflow_goal_gap(goal)
     target = float(goal.get("target_amount") or 0)
     saved = float(goal.get("current_saved") or 0)
     gap = max(target - saved, 0.0)
@@ -120,6 +122,32 @@ def goal_gap(goal: dict[str, Any], today: date | None = None) -> dict[str, Any]:
         "progress": (saved / target) if target > 0 else 0.0,
         "months_remaining": months,
         "monthly_needed": monthly_needed,
+    }
+
+
+def _cashflow_goal_gap(goal: dict[str, Any]) -> dict[str, Any]:
+    """现金流型目标（每年取 annual_amount、持续 duration_years 年）的资金需求。
+
+    复用 goals.plan_cashflow_goal 的确定性测算（含通胀放大 + 复利年金），
+    避免教育/养老这类目标因无 target_amount 字段而被误算为 0 需求。
+    """
+    from . import goals as _goals  # 延迟 import，规避模块初始化顺序
+
+    annual = float(goal.get("annual_amount") or 0)
+    duration = int(goal.get("duration_years") or 0)
+    start = int(goal.get("start_year") or 0)
+    saved = float(goal.get("current_saved") or 0)
+    plan = _goals.plan_cashflow_goal(annual, duration, start, current_saved=saved)
+    return {
+        "goal_id": goal.get("id"),
+        "name": goal.get("name") or goal.get("type"),
+        "target_amount": plan["fv_target"],
+        "current_saved": saved,
+        "gap": plan["gap"],
+        "progress": round(saved / plan["fv_target"], 4) if plan["fv_target"] > 0 else 0.0,
+        "months_remaining": start * 12,
+        "monthly_needed": plan["monthly_save"],
+        "kind": "cashflow",
     }
 
 

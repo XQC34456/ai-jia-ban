@@ -44,3 +44,15 @@ def test_prepay_requires_mortgage():
     data["liabilities"] = []
     r = sc.run_scenario(data, _snap(data), "prepay", {"prepay_amount": 100000})
     assert "error" in r
+
+
+def test_invest_amount_exceeds_liquid_returns_error():
+    # 现金仅 100 万，投入 200 万应报错
+    r = sc.run_scenario(_data(), _snap(_data()), "invest", {"amount": 2000000, "to_class": "equity"})
+    assert "error" in r
+
+
+def test_buy_house_down_payment_exceeds_liquid_returns_error():
+    # 房价 1000 万 → 首付 300 万 > 现金 100 万，应报错
+    r = sc.run_scenario(_data(), _snap(_data()), "buy_house", {"price": 10000000})
+    assert "error" in r

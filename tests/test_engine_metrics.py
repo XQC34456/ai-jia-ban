@@ -138,3 +138,15 @@ def test_calc_engine_is_compat_shim():
     data = _family(assets=[{"type": "存款", "value": 500000}])
     assert legacy.snapshot(data) == ce.snapshot(data)
     assert legacy.total_assets(data["assets"]) == ce.total_assets(data["assets"])
+
+
+def test_cashflow_goal_counts_in_goals_funding():
+    """现金流型目标（教育金每年 N 万）必须进入资金竞争，不能被算成 0 需求。"""
+    goals = [{"type": "教育", "name": "教育金", "goal_kind": "cashflow",
+              "annual_amount": 100000, "duration_years": 4, "start_year": 12,
+              "current_saved": 0}]
+    funding = ce.goals_funding(goals, monthly_surplus_value=10000)
+    assert funding["total_monthly_needed"] > 0
+    gap = ce.goal_gap(goals[0])
+    assert gap["monthly_needed"] is not None
+    assert gap["target_amount"] > 400000  # 通胀放大后的目标终值
