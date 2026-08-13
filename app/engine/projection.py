@@ -117,5 +117,5 @@ def retirement_funding_ratio(net_worth: float, annual_income: float, annual_expe
         "net_worth_at_retirement": round(nw_at_retirement, 2),
         "retirement_need_pv": round(need_pv, 2),
         "funding_ratio": round(rfr, 2) if rfr is not None else None,
-        "score": round(min(100.0, (rfr or 0.0) * 100)) if rfr is not None else 40,
+        "score": round(max(0.0, min(100.0, (rfr or 0.0) * 100))) if rfr is not None else 40,
     }

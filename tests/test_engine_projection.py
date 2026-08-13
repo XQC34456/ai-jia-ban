@@ -68,3 +68,11 @@ def test_retirement_funding_ratio_underfunded():
                                                                  "expense_growth": 0.0})
     assert r["funding_ratio"] < 0.5
     assert r["score"] < 50
+
+
+def test_retirement_funding_ratio_negative_net_worth_clamped():
+    # 负净资产 → 覆盖比为负，评分必须 clamp 到 0，不能出现负分
+    r = pr.retirement_funding_ratio(net_worth=-2000000, annual_income=40000, annual_expense=50000,
+                                    current_age=45)
+    assert r["funding_ratio"] < 0
+    assert r["score"] == 0
