@@ -56,3 +56,47 @@ def test_analyze_deviation_and_concentration():
     assert r["deviation"]["cash"] == "below"
     assert r["concentration"]["real_estate_pct"] > 0.7
     assert any(a["action"] == "增配" for a in r["adjustments"])
+
+
+def test_allocation_fitness_rewards_diversified():
+    # 现金10/固收30/股票30/房产30 → 金融资产在 balanced 区间内，房产不超 50%
+    assets = [{"type": "存款", "value": 100000}, {"type": "基金", "value": 300000},
+              {"type": "股票", "value": 300000}, {"type": "房产", "value": 300000}]
+    fit = al.allocation_fitness(assets)
+    assert fit["score"] > 80  # 唯一扣分来自单股 30% 的轻微集中度惩罚(5分)
+
+
+def test_allocation_fitness_penalizes_concentration():
+    assets = [{"type": "房产", "value": 8000000}, {"type": "存款", "value": 2000000}]
+    fit = al.allocation_fitness(assets)
+    assert fit["score"] < 60
+    assert fit["penalties"]["concentration"] > 0
+
+
+def test_allocation_fitness_penalizes_other():
+    # 同样 30% 占比：房产（明确资产）不扣，其他（配置不透明）应被扣分
+    a = [{"type": "存款", "value": 100000}, {"type": "基金", "value": 300000},
+         {"type": "股票", "value": 300000}, {"type": "房产", "value": 300000}]
+    b = [{"type": "存款", "value": 100000}, {"type": "基金", "value": 300000},
+         {"type": "股票", "value": 300000}, {"type": "其他", "value": 300000}]
+    fa = al.allocation_fitness(a)
+    fb = al.allocation_fitness(b)
+    assert fa["score"] > fb["score"]
+    assert fb["penalties"]["concentration"] > 0
+
+
+def test_personalized_policy_short_term_goal():
+    # 3 年内用款目标 → 提高现金下限、压降权益上限
+    goals = [{"goal_kind": "cashflow", "annual_amount": 500000, "duration_years": 2, "start_year": 2}]
+    pol = al.personalized_policy(None, goals)["target"]
+    base = al.allocation_policy("balanced", 10)
+    assert pol["cash"][0] > base["cash"][0]
+    assert pol["equity"][1] < base["equity"][1]
+
+
+def test_personalized_policy_high_debt():
+    liab = [{"type": "房贷", "monthly_payment": 30000}]
+    cf = [{"flow_type": "income", "amount": 50000, "period": "月"}]
+    pol = al.personalized_policy(None, None, liab, cf)["target"]
+    base = al.allocation_policy("balanced", 10)
+    assert pol["equity"][1] < base["equity"][1]  # DTI=0.6 > 0.5 压降权益上限

@@ -5,9 +5,10 @@
 """
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
-from . import allocation, metrics
+from . import allocation, metrics, projection
 
 __all__ = ["WEIGHTS", "wealth_score"]
 
@@ -117,17 +118,15 @@ def _allocation_dim(family_data):
     assets = family_data.get("assets", [])
     if not assets:
         return {"name": "allocation", "score": 40, "reasons": ["尚未记录资产，无法评估配置"]}
-    c = allocation.concentration(assets)
-    if c["real_estate_pct"] > 0.7:
-        score = 30
-        reasons = [f"房产占 {c['real_estate_pct']*100:.0f}%，资产过度集中于房产"]
-    elif c["hhi"] > 0.5:
-        score = 50
-        reasons = [f"资产集中度 HHI={c['hhi']:.2f}，分散不足"]
-    else:
-        score = 85
-        reasons = ["资产大类相对分散"]
-    return {"name": "allocation", "score": score, "reasons": reasons}
+    fit = allocation.allocation_fitness(
+        assets,
+        profile=family_data.get("family_profile"),
+        cashflows=family_data.get("cashflows"),
+        liabilities=family_data.get("liabilities"),
+        goals=family_data.get("goals"),
+    )
+    return {"name": "allocation", "score": fit["score"],
+            "reasons": fit["reasons"] or ["资产配置适配度良好"]}
 
 
 def _goals_dim(family_data):
@@ -148,15 +147,43 @@ def _goals_dim(family_data):
 
 
 def _retirement_dim(family_data):
-    """养老准备：按 4% 法则（净资产达到 25 倍年支出为财务自由）评估。"""
+    """养老准备：基于 Projection 的 Retirement Funding Ratio。
+
+    有年龄信息时用确定性投影算「退休时净资产 / 退休后需求现值」；
+    无年龄信息时回退 4% 法则（仅作辅助启发式，明确标注）。
+    """
     nw = metrics.net_worth(family_data.get("assets", []), family_data.get("liabilities", []))
     annual_exp = metrics.monthly_expense(family_data.get("cashflows", []),
                                          family_data.get("liabilities", [])) * 12
     if annual_exp <= 0:
         return {"name": "retirement", "score": 40, "reasons": ["尚未记录支出，无法评估养老准备"]}
-    ratio = nw / (annual_exp * 25)
-    score = min(100.0, ratio * 100)
-    reasons = [f"按 4% 法则，净资产约为年支出的 {ratio*25:.1f} 倍（目标 25 倍）"]
-    if ratio < 1:
-        reasons.append("距 25 倍年支出的养老目标仍有差距")
-    return {"name": "retirement", "score": round(score), "reasons": reasons}
+
+    current_age = _family_age(family_data)
+    if current_age is None:
+        ratio = nw / (annual_exp * 25)
+        score = min(100.0, ratio * 100)
+        reasons = [f"按 4% 法则（辅助启发式），净资产约为年支出的 {ratio*25:.1f} 倍（目标 25 倍）"]
+        if ratio < 1:
+            reasons.append("距 25 倍年支出的养老目标仍有差距")
+        return {"name": "retirement", "score": round(score), "reasons": reasons}
+
+    annual_income = metrics.monthly_income(family_data.get("cashflows", [])) * 12
+    rfr = projection.retirement_funding_ratio(nw, annual_income, annual_exp, current_age)
+    reasons = [f"退休({rfr['retirement_age']}岁)时预计净资产 {rfr['net_worth_at_retirement']:,.0f} 元，"
+               f"退休后资金需求现值 {rfr['retirement_need_pv']:,.0f} 元，资金覆盖比 {rfr['funding_ratio']:.2f}"]
+    if rfr["funding_ratio"] is not None and rfr["funding_ratio"] < 1:
+        reasons.append("退休资金覆盖比低于 1，养老资金不足")
+    return {"name": "retirement", "score": rfr["score"], "reasons": reasons}
+
+
+def _family_age(family_data) -> int | None:
+    """家庭「本人」当前年龄（无本人则取最年长者）；无出生年返回 None。"""
+    persons = family_data.get("persons", [])
+    if not persons:
+        return None
+    self_p = next((p for p in persons if p.get("relation") == "本人"), None)
+    p = self_p or persons[0]
+    by = p.get("birth_year")
+    if not by:
+        return None
+    return date.today().year - int(by)

@@ -51,3 +51,10 @@ def test_wealth_score_heavy_debt_penalized():
     data = _data(liabilities=[{"type": "房贷", "monthly_payment": 30000}])
     dims = {d["name"]: d for d in score.wealth_score(data)["dimensions"]}
     assert dims["debt"]["score"] < 60  # DTI = 30000/50000 = 0.6 > 0.5
+
+
+def test_retirement_dim_uses_funding_ratio():
+    # 有年龄信息 → 走 Retirement Funding Ratio（理由里含"资金覆盖比"）
+    data = _data(persons=[{"name": "本人", "relation": "本人", "birth_year": 1986}])
+    dims = {d["name"]: d for d in score.wealth_score(data)["dimensions"]}
+    assert "资金覆盖比" in " ".join(dims["retirement"]["reasons"])
