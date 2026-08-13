@@ -86,9 +86,13 @@ def _amortize_year(principal: float, annual_rate: float, remaining_months: int):
     return remaining, principal_repaid, interest
 
 
-def _flow(age: int, annual_income: float, annual_living_expense: float, a: dict, t: int):
-    """第 t 年的收入 / 生活支出 / 养老金（确定性单一路径）。"""
-    if age < a["retirement_age"]:
+def _flow(start_age: int, annual_income: float, annual_living_expense: float, a: dict, t: int):
+    """第 t 年的收入 / 生活支出 / 养老金（确定性单一路径）。
+
+    start_age 为「该年起始年龄」：start_age < retirement_age 仍属工作年（有工资），
+    否则进入退休年（无工资、按退休支出比例 + 养老金）。
+    """
+    if start_age < a["retirement_age"]:
         income = annual_income * (1 + a["income_growth"]) ** t
         living = annual_living_expense * (1 + a["expense_growth"]) ** t
         pension = 0.0
@@ -122,7 +126,8 @@ def project_family(assets: dict, debts: list, annual_income: float, annual_livin
 
     for t in range(years + 1):
         age = current_age + t
-        income, living, pension = _flow(age, annual_income, annual_living_expense, a, t)
+        start_age = current_age + t - 1 if t > 0 else current_age
+        income, living, pension = _flow(start_age, annual_income, annual_living_expense, a, t)
 
         if t == 0:
             # 现状快照：仅报告本年度债务服务，不实际摊销、不滚动资产
@@ -188,8 +193,9 @@ def retirement_funding_ratio(assets: dict, debts: list, annual_income: float,
     a = {**DEFAULT_ASSUMPTIONS, **(assumptions or {})}
     seq = project_family(assets, debts, annual_income, annual_living_expense, current_age, a, allocation)
     retire_year = int(a["retirement_age"]) - current_age          # 退休相对年数（≤0 表示已退休）
-    # 退休时点 = 最后一个工作年末（退休前一刻），已退休则取当前快照
-    at = seq[max(retire_year - 1, 0)]
+    # 退休时点 = 最后一个工作年末（退休前一刻）：seq[retire_year] 的起始年龄仍是工作年；
+    # 已退休（retire_year≤0）则取当前快照 seq[0]。
+    at = seq[min(max(retire_year, 0), len(seq) - 1)]
     investable = at["investable"]
     net_worth = at["net_worth"]
 
