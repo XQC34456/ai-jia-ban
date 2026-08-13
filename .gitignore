@@ -1,0 +1,19 @@
+# === 密钥与本地配置（绝不提交）===
+.env
+.env.*
+!.env.example
+
+# === 数据库（含用户数据，绝不提交）===
+data.db
+*.db
+*.sqlite
+*.sqlite3
+
+# === Python ===
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# === 其他 ===
+.DS_Store
+Thumbs.db
