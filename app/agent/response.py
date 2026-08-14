@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 
-from ..schemas.agent import AgentResponse, EvidenceRef, MetricRef
+from ..schemas.agent import AgentResponse, EvidenceRef, MetricRef, PriorityRef
 
 __all__ = ["build_metrics", "known_limitations_of", "build_response",
            "assemble_advisor_response"]
@@ -405,6 +405,36 @@ def _build_evidence(tool_results: list[dict], evidence_raw: list) -> list[Eviden
                                metric=MetricRef(key=mkey, label=label, unit=unit,
                                                 value=value, source=source)))
     return out
+
+
+# ---------- V2.3 主要矛盾提取（Decision 的 priorities，确定性，LLM 不判断） ----------
+
+def _build_priorities(tool_results: list[dict]) -> list[PriorityRef]:
+    """从 get_wealth_issues 结果确定性提取主要矛盾（priorities 已按 P0→P2 排序）。
+
+    本层只读不改序；finding 逐字来自 issue.finding。
+    """
+    for tr in tool_results or []:
+        if tr.get("name") != "get_wealth_issues":
+            continue
+        result = tr.get("result")
+        if not isinstance(result, dict):
+            continue
+        issues = result.get("issues") or []
+        finding_by_id = {i.get("issue_id"): (i.get("finding") or "")
+                         for i in issues if isinstance(i, dict)}
+        out: list[PriorityRef] = []
+        for p in result.get("priorities") or []:
+            if not isinstance(p, dict) or not p.get("issue_id"):
+                continue
+            out.append(PriorityRef(
+                issue_id=p["issue_id"],
+                severity=p.get("severity", ""),
+                title=p.get("title", ""),
+                finding=finding_by_id.get(p["issue_id"], ""),
+            ))
+        return out
+    return []
 
 
 def assemble_advisor_response(tool_results: list[dict], llm_json: dict | None,
