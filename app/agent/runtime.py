@@ -61,9 +61,10 @@ def handle(message: str, user: dict, llm: LLMProvider | None = None,
         intent = route_intent(message, llm, wealth_context=wealth_context)
         hint = None
 
-    # ② advisor_path：非 EXPLAIN_RESULT 意图先走顾问式 tool_loop（LLM 为插件）。
+    # ② advisor_path：所有意图（含 EXPLAIN_RESULT）先走顾问式 tool_loop（LLM 为插件）。
     #    有 LLM 能力时「顾问」接管，失败 / 无 LLM → 回退确定性 dispatch（③④⑤）。
-    if intent != "EXPLAIN_RESULT" and llm is not None:
+    #    EXPLAIN_RESULT 也走 advisor_path，单轮内由 LLM 调工具解释（跨轮上下文留 V2.4）。
+    if llm is not None:
         resp = advise(user, message, llm, wealth_context=wealth_context, intent=intent)
         if resp is not None:
             return resp
