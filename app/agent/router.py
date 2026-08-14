@@ -51,8 +51,13 @@ def refusal_gate(message: str) -> dict | None:
     return {"scenario": "invest"}
 
 
-def route_intent(message: str, llm: LLMProvider | None = None) -> str:
-    """确定性关键词 → LLM 兜底 → Literal 七意图校验 → 兜底 VIEW_OVERVIEW。"""
+def route_intent(message: str, llm: LLMProvider | None = None,
+                 wealth_context: str | None = None) -> str:
+    """确定性关键词 → LLM 兜底 → Literal 七意图校验 → 兜底 VIEW_OVERVIEW。
+
+    wealth_context 仅在 LLM 兜底注入（关键词命中的确定性路径不注入；意图分类输出
+    是枚举、非数字，注入背景可消歧、无编造风险）。
+    """
     for intent, words in _INTENT_KEYWORDS:
         if any(w in message for w in words):
             return intent
@@ -63,6 +68,7 @@ def route_intent(message: str, llm: LLMProvider | None = None) -> str:
             schema={"type": "object",
                     "properties": {"intent": {"type": "string", "enum": list(AGENT_INTENTS)}},
                     "required": ["intent"]},
+            context=wealth_context,
         )
         if raw and raw.get("intent") in AGENT_INTENTS:
             return raw["intent"]

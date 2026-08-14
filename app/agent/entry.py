@@ -1,7 +1,13 @@
-"""AI 顾问统一入口：抽取（建档）优先，否则走七意图 Agent。A3 handle() 零改动。"""
+"""AI 顾问统一入口：抽取（建档）优先，否则走七意图 Agent。
+
+V2.1 新增：进入 handle 前预取 Wealth Context 文本（V2.1 只在 LLM 兜底消费，
+V2.2/V2.3 将全量消费）。A3 handle() 编排逻辑零改动，仅扩展可选参数。
+"""
 from __future__ import annotations
 
+from .. import db
 from ..schemas.agent import AgentResponse, ConfirmCard
+from .context import build_wealth_context, context_to_text
 from .profile import create_confirm, extract_actions
 from .provider import LLMProvider
 from .runtime import handle
@@ -18,4 +24,11 @@ def converse(message: str, user: dict, llm: LLMProvider | None = None,
     actions = extract_actions(message)
     if actions:
         return create_confirm(user["family_id"], actions)
-    return handle(message, user, llm=llm, context=context)
+    wealth_context = _wealth_context_text(user)
+    return handle(message, user, llm=llm, context=context, wealth_context=wealth_context)
+
+
+def _wealth_context_text(user: dict) -> str | None:
+    """预取 Wealth Context 文本（组装器纯函数，数字带 source）。"""
+    data = db.dump_family(user["family_id"])
+    return context_to_text(build_wealth_context(data))

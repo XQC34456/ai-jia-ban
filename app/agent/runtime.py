@@ -34,7 +34,7 @@ _CLARIFY_PREFIX = "需要补充以下信息："
 
 
 def handle(message: str, user: dict, llm: LLMProvider | None = None,
-           context: dict | None = None) -> AgentResponse:
+           context: dict | None = None, wealth_context: str | None = None) -> AgentResponse:
     """编排一次完整交互：拒算门 → 意图路由 → 参数提取 → 工具分派 → 组装响应。"""
     # ① 拒算门（优先于普通意图路由）
     refusal = refusal_gate(message)
@@ -45,7 +45,7 @@ def handle(message: str, user: dict, llm: LLMProvider | None = None,
         intent = "SCENARIO_COMPARE"
         hint = refusal["scenario"]
     else:
-        intent = route_intent(message, llm)
+        intent = route_intent(message, llm, wealth_context=wealth_context)
         hint = None
 
     # ② SCENARIO_COMPARE：参数提取 + 分派
