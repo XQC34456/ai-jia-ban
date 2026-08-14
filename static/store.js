@@ -10,6 +10,9 @@ const { reactive, computed } = Vue;
 export const store = reactive({
   auth: { token: localStorage.getItem('token') || null, username: '', tier: 'free' },
 
+  // 冷启动完成标志（前端状态，非落库；已建档用户自动置 true）
+  onboarded: localStorage.getItem('onboarded') === '1',
+
   // —— 切片：驾驶舱核心（唯一财富事实源；loading/error 为向后兼容别名）——
   overview: null,
   loading: false,
@@ -61,7 +64,9 @@ export function logout() {
   store.sandbox.comparison = null;
   store.chat.messages = [];
   store.family.data = null;
+  store.onboarded = false;
   localStorage.removeItem('token');
+  localStorage.removeItem('onboarded');
 }
 
 export async function loadOverview() {

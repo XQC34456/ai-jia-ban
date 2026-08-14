@@ -1,12 +1,13 @@
 // 统一 App Shell：Topbar + Sidebar + Main（hash 路由视图容器）+ 登录门。
 // 铁律：本文件只做「壳」的布局与导航，不做任何财富计算；数据一律来自 store 各切片。
-import { store, loggedIn, login, register, logout, upgrade } from './store.js';
+import { store, loggedIn, login, register, logout, upgrade, ensureOverview } from './store.js';
 import { currentRoute, navigate } from './router.js';
 import { VIEWS, NAV_ITEMS } from './views/index.js';
+import { OnboardingView } from './views/onboarding.js';
 import { icon } from './icons.js';
 import { fmtMoney, fmtPct } from './format.js';
 
-const { createApp, ref, computed, onMounted } = Vue;
+const { createApp, ref, computed, onMounted, watch } = Vue;
 
 const currentView = computed(() => VIEWS[currentRoute.value] || VIEWS.overview);
 const currentLabel = computed(() => {
@@ -96,12 +97,33 @@ const Sidebar = {
 
 // ---------- 根组件 ----------
 const App = {
-  components: { LoginView, Topbar, Sidebar },
+  components: { LoginView, Topbar, Sidebar, OnboardingView },
   setup() {
-    return { loggedIn, currentView, currentRoute, NAV_ITEMS };
+    // 冷启动：未完成 onboarding 且空数据 → 覆盖显示向导，绝不先甩「请输入家庭资产」。
+    const needOnboarding = ref(false);
+    async function checkOnboarding() {
+      if (store.onboarded) { needOnboarding.value = false; return; }
+      try {
+        await ensureOverview();
+        const b = store.overview;
+        if (b && !(b.net_worth === 0 && (!b.issues || !b.issues.length))) {
+          // 已建档（有数据）→ 跳过冷启动
+          localStorage.setItem('onboarded', '1');
+          store.onboarded = true;
+          needOnboarding.value = false;
+        } else {
+          needOnboarding.value = true;
+        }
+      } catch { needOnboarding.value = false; }
+    }
+    // immediate: 页面加载即已登录（token 已在 localStorage）时也触发一次判断
+    watch(loggedIn, (v) => { if (v) checkOnboarding(); else needOnboarding.value = false; }, { immediate: true });
+    function onOnboardDone() { needOnboarding.value = false; }
+    return { loggedIn, currentView, currentRoute, NAV_ITEMS, needOnboarding, onOnboardDone };
   },
   template: `
     <login-view v-if="!loggedIn"></login-view>
+    <onboarding-view v-else-if="needOnboarding" @done="onOnboardDone"></onboarding-view>
     <div v-else class="shell">
       <topbar></topbar>
       <div class="shell-body">
