@@ -31,3 +31,18 @@ export const LIMITATION_LABELS = {
   goal_retirement_semantic_overlap: '养老目标与退休测算在口径上存在部分重叠',
   other_asset_liquidity_assumption: '「其他」类资产按不可即时变现处理（流动性假设）',
 };
+
+// 情景 → 中文标签（下一步按钮 / 沙盘跳转，纯展示映射，非财富计算）
+export const SCENARIO_LABELS = {
+  buy_house: '买房',
+  prepay: '提前还贷',
+  invest: '投资',
+  income_change: '收入变化',
+};
+
+// 财富健康度等级 → 一句人话结论（体检报告横幅，先结论后数字）
+export const LEVEL_CONCLUSION = {
+  稳健: '你的家庭财务整体稳健，继续保持。',
+  需关注: '你的家庭财务有几个需要关注的地方。',
+  脆弱: '你的家庭财务比较脆弱，建议尽快调整。',
+};

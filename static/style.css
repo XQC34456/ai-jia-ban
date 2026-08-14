@@ -630,3 +630,46 @@ button { font-family: inherit; }
 .data-table .btn-mini.danger:hover { border-color: #fecaca; background: var(--warn-soft); }
 
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+
+/* ===== 4.1 人性化：体检报告横幅 / 沙盘模式提示 / 下一步按钮 / 为什么 ===== */
+
+.report-banner {
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--brand);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+}
+.report-banner.lv-warn { border-left-color: var(--score-caution); }
+.report-banner.lv-bad { border-left-color: var(--score-bad); }
+.report-label { font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+.report-top3-title { font-size: 16px; font-weight: 700; color: var(--text); margin: 6px 0 10px; }
+.report-top3-item { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); padding: 4px 0; }
+.report-top3-item .sev { margin: 0; }
+.report-no-issue { font-size: 14px; color: var(--text); margin: 8px 0; }
+.report-status {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line);
+  font-size: 13px; color: var(--muted);
+}
+.report-score-inline { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+.sandbox-banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; margin-bottom: 14px;
+  border: 1px solid var(--brand-line); border-radius: var(--radius-sm);
+  background: var(--brand-soft); color: var(--text); font-size: 13px;
+}
+.sandbox-badge {
+  flex-shrink: 0; padding: 2px 10px; border-radius: 999px;
+  background: var(--brand); color: #fff; font-size: 12px; font-weight: 600;
+}
+
+.reason-block { margin-top: 6px; }
+.reason-title { font-size: 12px; font-weight: 600; color: var(--muted); }
+.reason-list { margin: 2px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+
+.rec-sim { margin-left: auto; white-space: nowrap; color: var(--brand-dark); border-color: var(--brand-line); }
+.rec-sim:hover { color: #fff; background: var(--brand); border-color: var(--brand); }
