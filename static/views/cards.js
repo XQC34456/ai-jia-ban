@@ -1,6 +1,8 @@
 // 驾驶舱卡片组件（从 cockpit.js 迁移）：只读 overview 对象渲染，零财富计算。
 // 派生 computed 仅做格式化/着色/排序，绝不复算任何财富结论。
-import { fmtRatio, CLASS_ORDER, CLASS_LABELS, CLASS_COLORS, FINANCIAL_CLASSES, SEV_TONE } from '../format.js';
+import { fmtRatio, CLASS_ORDER, CLASS_LABELS, CLASS_COLORS, FINANCIAL_CLASSES, SEV_TONE, SCENARIO_LABELS } from '../format.js';
+import { store } from '../store.js';
+import { navigate } from '../router.js';
 
 export const HealthScoreCard = {
   props: { o: Object },
@@ -165,6 +167,12 @@ export const InsightPanel = {
           <div class="insight-body">
             <div class="insight-title">{{ i.title }}</div>
             <div class="insight-finding" v-if="i.finding">{{ i.finding }}</div>
+            <div v-if="i.reason && i.reason.length" class="reason-block">
+              <div class="reason-title">为什么</div>
+              <ul class="reason-list">
+                <li v-for="(r, idx) in i.reason" :key="idx">{{ r }}</li>
+              </ul>
+            </div>
           </div>
         </div>
         <div v-if="recommendations.length" class="insight-recs">
@@ -172,9 +180,17 @@ export const InsightPanel = {
           <div v-for="r in recommendations" :key="r.recommendation_id || r.action" class="rec-item">
             <span class="rec-action">{{ r.action }}</span>
             <span class="rec-detail">{{ r.detail }}</span>
+            <button v-if="r.scenario" class="btn-mini rec-sim" @click="simulate(r)">
+              模拟「{{ scenarioLabel(r) }}」→
+            </button>
           </div>
         </div>
       </template>
     </div>`,
-  methods: { sevTone: (s) => SEV_TONE[s] || '' },
+  methods: {
+    sevTone: (s) => SEV_TONE[s] || '',
+    scenarioLabel: (r) => SCENARIO_LABELS[r.scenario] || '调整',
+    // 下一步：切换到对应沙盘场景（默认参数），不反推任何金额。
+    simulate(r) { store.sandbox.preset = r.scenario; navigate('sandbox'); },
+  },
 };

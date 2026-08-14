@@ -25,7 +25,8 @@ export const store = reactive({
   issues: { data: null, loading: false, error: null },
 
   // —— 切片：情景沙盘（单次模拟 + 多方案对比）——
-  sandbox: { result: null, comparison: null, loading: false, error: null },
+  // preset：跨视图「下一步」信号（推荐按钮写入、沙盘 setup 读取后清空），仅前端状态，不落库。
+  sandbox: { result: null, comparison: null, loading: false, error: null, preset: null },
 
   // —— 切片：AI 顾问对话（Phase 4 迁移 vanilla chat 后启用）——
   chat: { messages: [], loading: false, error: null },

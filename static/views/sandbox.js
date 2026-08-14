@@ -86,9 +86,13 @@ function defaultParams(name) {
 
 export const SandboxView = {
   setup() {
+    // 预选场景（来自「下一步」按钮的跨视图信号），只切换场景 + 默认参数，绝不反推金额。
+    const preset = store.sandbox.preset;
+    store.sandbox.preset = null;
+    const initial = (preset && SCENARIOS[preset]) ? preset : 'buy_house';
     const st = reactive({
-      scenario: 'buy_house',
-      options: [{ id: 'A', params: defaultParams('buy_house') }],
+      scenario: initial,
+      options: [{ id: 'A', params: defaultParams(initial) }],
       comparing: false,
       error: null,
       result: null,      // 后端 compare 原始返回 {baseline, options, comparison}
@@ -189,6 +193,10 @@ export const SandboxView = {
   },
   template: `
   <div class="view">
+    <div class="sandbox-banner">
+      <span class="sandbox-badge">沙盘模式</span>
+      <span>下面的模拟只用于对比决策，<b>不会改动你的真实家庭数据</b>。</span>
+    </div>
     <p class="lead">选择情景并配置 1~3 个方案，统一由后端 apply_scenario → build_overview 重算财富，这里只负责展示对比。</p>
 
     <!-- 情景选择 -->

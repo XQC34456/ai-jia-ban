@@ -1,7 +1,8 @@
 // 视图：风险问题（Phase 4 迁移，读 store.issues 切片 → /api/wealth/issues）。
 // 只读 Decision Layer build_issues 的统一输出（P0→P2 排序），零财富计算，不接 LLM。
 import { store, loadIssues } from '../store.js';
-import { SEV_TONE } from '../format.js';
+import { navigate } from '../router.js';
+import { SEV_TONE, SCENARIO_LABELS } from '../format.js';
 
 const { onMounted, computed } = Vue;
 
@@ -17,8 +18,11 @@ export const IssuesView = {
     });
 
     function sevTone(s) { return SEV_TONE[s] || ''; }
+    function scenarioLabel(r) { return SCENARIO_LABELS[r.scenario] || '调整'; }
+    // 下一步：切换到对应沙盘场景（默认参数），不反推任何金额。
+    function simulate(r) { store.sandbox.preset = r.scenario; navigate('sandbox'); }
 
-    return { store, issues, counts, sevTone };
+    return { store, issues, counts, sevTone, scenarioLabel, simulate };
   },
   template: `
     <div class="view view-sm">
@@ -57,6 +61,9 @@ export const IssuesView = {
             <div v-for="r in i.recommendations" :key="r.recommendation_id || r.action" class="rec-item">
               <span class="rec-action">{{ r.action }}</span>
               <span class="rec-detail">{{ r.detail }}</span>
+              <button v-if="r.scenario" class="btn-mini rec-sim" @click="simulate(r)">
+                模拟「{{ scenarioLabel(r) }}」→
+              </button>
             </div>
           </div>
         </div>
