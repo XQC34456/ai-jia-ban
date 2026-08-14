@@ -4,6 +4,7 @@
 import { store } from '../store.js';
 import { api, ApiError } from '../api.js';
 import { fmtMoney, LIMITATION_LABELS } from '../format.js';
+import { interpret } from '../lib/scenario-interpret.js';
 
 const { reactive, computed } = Vue;
 
@@ -150,6 +151,30 @@ export const SandboxView = {
       }));
     });
 
+    // —— 决策解释层（纯前端叙事，只读 comparison + issues，绝不重算财富）——
+    const interpretations = computed(() => {
+      const r = st.result;
+      if (!r || !r.options) return [];
+      return r.options.map(o => interpret(
+        r.scenario, o, r.baseline, o.overview, (r.comparison && r.comparison[o.id]) || [],
+      ));
+    });
+
+    // 是否已建档：净资产为 0 且无任何问题 → 判定为空数据（引导先建档）
+    const hasData = computed(() => {
+      const b = st.result && st.result.baseline;
+      if (!b) return true;
+      return !(b.net_worth === 0 && (!b.issues || !b.issues.length));
+    });
+
+    // 所有方案差异有限 → 显示「各方案差异不大」，绝不制造优劣
+    const allNoDiff = computed(() => {
+      const ints = interpretations.value;
+      return ints.length > 0 && ints.every(i => i.position.key === 'no_diff');
+    });
+
+    function resetToBaseline() { st.result = null; st.error = null; }
+
     const limitations = computed(() => {
       const ret = st.result && st.result.baseline && st.result.baseline.retirement;
       return (ret && ret.known_limitations) || [];
@@ -159,7 +184,7 @@ export const SandboxView = {
     return {
       store, st, SCENARIOS, SCENARIO_KEYS, pickScenario, addOption, removeOption,
       runCompare, upgrade, rows, fmtValue, fmtDelta, deltaTone, fmtMoney,
-      limitations, limitationLabel,
+      limitations, limitationLabel, interpretations, hasData, allNoDiff, resetToBaseline,
     };
   },
   template: `
@@ -197,7 +222,7 @@ export const SandboxView = {
 
     <div class="actions">
       <button class="btn-primary" :disabled="st.comparing" @click="runCompare">
-        {{ st.comparing ? '对比中…' : '开始对比' }}
+        {{ st.comparing ? '对比中…' : (st.result ? '重新对比' : '开始对比') }}
       </button>
     </div>
 
@@ -210,10 +235,52 @@ export const SandboxView = {
     <section v-if="st.result" class="result">
       <div class="result-head">
         <h2>对比结果 · {{ SCENARIOS[st.scenario].label }}</h2>
-        <div class="baseline-chip">当前净资产 {{ fmtMoney(st.result.baseline.net_worth) }} · 财富评分 {{ fmtValue(st.result.baseline.wealth_score, 'score') }}</div>
+        <div class="result-head-actions">
+          <div class="baseline-chip">当前净资产 {{ fmtMoney(st.result.baseline.net_worth) }} · 财富评分 {{ fmtValue(st.result.baseline.wealth_score, 'score') }}</div>
+          <button class="btn-ghost" @click="resetToBaseline">返回基线</button>
+        </div>
       </div>
 
-      <table class="cmp-table">
+      <!-- 空数据引导（0 数据 → 先建档） -->
+      <div v-if="!hasData" class="state-empty">
+        <h3>还没有家庭财务数据</h3>
+        <p>沙盘需要先知道「现在是什么样」，才能对比「改变之后会怎样」。请先到「家庭数据」页完成建档。</p>
+      </div>
+
+      <!-- 差异有限提示（顾问感：不制造优劣） -->
+      <div v-if="hasData && allNoDiff" class="state-no-diff">
+        各方案与当前状态差异有限，暂无明显优劣，可调整参数后再看。
+      </div>
+
+      <!-- 决策叙事卡（发生了什么 / 定位 / 风险 / 问题变化，全部只读后端返回） -->
+      <div v-if="hasData" class="interp-grid">
+        <div v-for="(ip, i) in interpretations" :key="st.result.options[i].id" class="interp-card">
+          <div class="interp-head">
+            <span class="opt-tag">方案 {{ st.result.options[i].id }}</span>
+            <span class="pos-badge" :class="'pos-' + ip.position.key">{{ ip.position.label }}</span>
+          </div>
+          <div class="interp-summary">{{ ip.summary }}</div>
+          <div class="interp-headline">{{ ip.headline }}</div>
+          <div v-if="ip.changes.length" class="interp-changes">
+            <span v-for="c in ip.changes" :key="c.key" class="change-chip" :class="deltaTone(c.key, c.delta)">
+              {{ c.label }} <b>{{ fmtDelta(c.delta, c.unit) }}</b>
+            </span>
+          </div>
+          <div v-if="ip.risk" class="interp-risk">⚠ {{ ip.risk }}</div>
+          <div v-if="ip.issueDelta.resolved.length || ip.issueDelta.added.length" class="issue-delta">
+            <div v-if="ip.issueDelta.resolved.length" class="issue-resolved">
+              <span class="issue-label">已消除</span>
+              <span v-for="t in ip.issueDelta.resolved" :key="t" class="issue-chip">{{ t }}</span>
+            </div>
+            <div v-if="ip.issueDelta.added.length" class="issue-new">
+              <span class="issue-label">新增风险</span>
+              <span v-for="t in ip.issueDelta.added" :key="t" class="issue-chip">{{ t }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <table v-if="hasData" class="cmp-table">
         <thead>
           <tr>
             <th>指标</th>
@@ -233,9 +300,9 @@ export const SandboxView = {
         </tbody>
       </table>
 
-      <p class="foot-note">差值 = 方案值 − 当前值。财富评分 / RFR / NWC 均由后端重算，本页未复制任何财富公式。</p>
+      <p v-if="hasData" class="foot-note">差值 = 方案值 − 当前值。财富评分 / RFR / NWC 均由后端重算，本页未复制任何财富公式。</p>
 
-      <div v-if="limitations.length" class="limits-note">
+      <div v-if="hasData && limitations.length" class="limits-note">
         <div class="limits-title">⚠️ 模型能力边界（方案变化不会消除以下假设）</div>
         <ul>
           <li v-for="k in limitations" :key="k">{{ limitationLabel(k) }}</li>

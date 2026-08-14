@@ -404,6 +404,57 @@ button { font-family: inherit; }
 .limits-note ul { margin: 0; padding-left: 18px; }
 .limits-note li { font-size: 12px; color: var(--brand-dark); }
 
+/* 结果头：基线 + 返回基线按钮 */
+.result-head-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* 空数据引导 */
+.state-empty {
+  padding: 36px 20px; text-align: center; color: var(--muted);
+  border: 1px dashed var(--line-strong); border-radius: var(--radius-lg); margin-bottom: 16px;
+}
+.state-empty h3 { color: var(--text); font-size: 16px; margin-bottom: 6px; }
+.state-empty p { font-size: 13px; }
+
+/* 差异有限提示（顾问感：不制造优劣） */
+.state-no-diff {
+  padding: 10px 14px; background: var(--bg-soft); color: var(--muted);
+  border-radius: 10px; font-size: 13px; margin-bottom: 14px;
+}
+
+/* 决策叙事卡 */
+.interp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-bottom: 18px; }
+.interp-card {
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 14px; display: flex; flex-direction: column; gap: 8px;
+}
+.interp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.interp-summary { font-weight: 600; font-size: 14px; color: var(--text); }
+.interp-headline { font-size: 13px; color: var(--muted); }
+.interp-changes { display: flex; flex-wrap: wrap; gap: 6px; }
+.change-chip {
+  font-size: 12px; padding: 3px 10px; border-radius: 999px;
+  background: var(--bg-soft); color: var(--text);
+}
+.change-chip.pos { background: var(--positive-soft); color: var(--score-good); }
+.change-chip.neg { background: var(--warn-soft); color: var(--score-bad); }
+.interp-risk { font-size: 12px; color: var(--score-bad); background: var(--warn-soft); border-radius: 8px; padding: 6px 10px; }
+
+/* 定位徽标 */
+.pos-badge {
+  flex-shrink: 0; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+}
+.pos-richer, .pos-safer, .pos-balanced { background: var(--positive-soft); color: var(--score-good); }
+.pos-tradeoff { background: var(--brand-soft); color: var(--brand-dark); }
+.pos-no_diff { background: var(--bg-soft); color: var(--muted); }
+
+/* 问题变化（消除 / 新增） */
+.issue-delta { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 8px; }
+.issue-resolved, .issue-new { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.issue-label { font-size: 12px; color: var(--muted); font-weight: 600; margin-right: 2px; }
+.issue-chip { font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--bg-soft); color: var(--text); }
+.issue-resolved .issue-chip { background: var(--positive-soft); color: var(--score-good); }
+.issue-new .issue-chip { background: var(--warn-soft); color: var(--score-bad); }
+
 @media (max-width: 640px) {
   .cmp-table { font-size: 12px; }
   .cmp-table th, .cmp-table td { padding: 8px 6px; }
