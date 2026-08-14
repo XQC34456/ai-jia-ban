@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import db, decision, report
-from .api import agent, goal, scenario, wealth
+from .api import agent, goal, onboarding, scenario, wealth
 from .agent.profile import apply_confirmation
 
 
@@ -44,6 +44,7 @@ app.add_middleware(
 )
 
 app.include_router(wealth.router)
+app.include_router(onboarding.router)
 app.include_router(scenario.router)
 app.include_router(goal.router)
 app.include_router(agent.router)
