@@ -146,6 +146,9 @@ def migrate() -> None:
         if version < 3:
             _migrate_v3(conn)
             version = 3
+        if version < 4:
+            _migrate_v4(conn)
+            version = 4
         conn.execute(
             "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
             (str(version),),
@@ -244,6 +247,56 @@ def _migrate_v3(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migrate_v4(conn: sqlite3.Connection) -> None:
+    """V2.4：新建 Advisor Memory 三张表（短期对话 / 家庭事实 / 顾问判断）。
+
+    记忆层只存「历史 + 判断 + 依据」，绝不参与财富计算（Engine 只读主表）。
+    """
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS conversation_message (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            family_id INTEGER NOT NULL,
+            turn INTEGER NOT NULL,
+            role TEXT NOT NULL,
+            message TEXT,
+            intent TEXT,
+            tool_calls TEXT,
+            corrected INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(family_id) REFERENCES family(id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS memory_fact (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            family_id INTEGER NOT NULL,
+            key TEXT NOT NULL,
+            value TEXT NOT NULL,
+            source TEXT NOT NULL,
+            confidence TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            superseded_by INTEGER,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(family_id) REFERENCES family(id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS advisor_judgment (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            family_id INTEGER NOT NULL,
+            priorities TEXT NOT NULL,
+            evidence TEXT,
+            recommendation TEXT,
+            validity_conditions TEXT NOT NULL,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            invalidated_at TEXT,
+            FOREIGN KEY(family_id) REFERENCES family(id)
+        )
+    """)
+
+
 def create_family(name: str = "我的家庭") -> int:
     conn = get_conn()
     try:
@@ -337,6 +390,130 @@ def dump_family(family_id: int) -> dict[str, Any]:
         "insurance": get_insurances(family_id),
         "family_profile": get_family_profile(family_id),
     }
+
+
+# ---------- V2.4 Advisor Memory（只存历史+判断，绝不参与财富计算） ----------
+
+def append_conversation(family_id: int, role: str, message: str | None,
+                        intent: str | None = None, tool_calls: list[str] | None = None,
+                        corrected: bool = False) -> int:
+    """追加一条对话消息（turn 自动递增）。assistant 轮存「结论摘要」非全文。"""
+    conn = get_conn()
+    try:
+        turn = conn.execute(
+            "SELECT COALESCE(MAX(turn), 0) + 1 FROM conversation_message WHERE family_id = ?",
+            (family_id,),
+        ).fetchone()[0]
+        tc = json.dumps(tool_calls, ensure_ascii=False) if tool_calls else None
+        cur = conn.execute(
+            "INSERT INTO conversation_message "
+            "(family_id, turn, role, message, intent, tool_calls, corrected, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (family_id, turn, role, message, intent, tc, int(corrected), _now()),
+        )
+        conn.commit()
+        return int(cur.lastrowid)
+    finally:
+        conn.close()
+
+
+def recent_conversations(family_id: int, n: int) -> list[dict[str, Any]]:
+    """返回最近 n 条对话消息（按 turn 倒序，最新在前）。JSON 字段反序列化。"""
+    rows = _rows(
+        "SELECT * FROM conversation_message WHERE family_id = ? ORDER BY turn DESC LIMIT ?",
+        (family_id, n),
+    )
+    for r in rows:
+        r["tool_calls"] = json.loads(r["tool_calls"]) if r["tool_calls"] else None
+        r["corrected"] = bool(r["corrected"])
+    return rows
+
+
+def upsert_fact(family_id: int, key: str, value: str, source: str, confidence: str) -> int:
+    """写入/更新一条家庭事实（版本化）。
+
+    相同 value+source → 幂等返回现有 id；否则 version+1，旧版本 superseded_by 指向新 id。
+    """
+    conn = get_conn()
+    try:
+        current = conn.execute(
+            "SELECT * FROM memory_fact WHERE family_id = ? AND key = ? AND superseded_by IS NULL",
+            (family_id, key),
+        ).fetchone()
+        if current and current["value"] == value and current["source"] == source:
+            return int(current["id"])
+        version = conn.execute(
+            "SELECT COALESCE(MAX(version), 0) + 1 FROM memory_fact WHERE family_id = ? AND key = ?",
+            (family_id, key),
+        ).fetchone()[0]
+        now = _now()
+        cur = conn.execute(
+            "INSERT INTO memory_fact "
+            "(family_id, key, value, source, confidence, version, superseded_by, "
+            "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)",
+            (family_id, key, value, source, confidence, version, now, now),
+        )
+        new_id = int(cur.lastrowid)
+        if current:
+            conn.execute(
+                "UPDATE memory_fact SET superseded_by = ? WHERE id = ?",
+                (new_id, current["id"]),
+            )
+        conn.commit()
+        return new_id
+    finally:
+        conn.close()
+
+
+def current_facts(family_id: int) -> list[dict[str, Any]]:
+    """返回当前有效事实（superseded_by IS NULL）。历史版本仅供失效检测，不在此返回。"""
+    return _rows(
+        "SELECT * FROM memory_fact WHERE family_id = ? AND superseded_by IS NULL",
+        (family_id,),
+    )
+
+
+def save_judgment(family_id: int, priorities: list[dict], evidence: list[dict] | None,
+                  recommendation: str | None, validity_conditions: dict) -> int:
+    """写入一条顾问判断；旧 active 置 stale（每个家庭最多一条 active）。"""
+    conn = get_conn()
+    try:
+        conn.execute(
+            "UPDATE advisor_judgment SET status = 'stale', invalidated_at = ? "
+            "WHERE family_id = ? AND status = 'active'",
+            (_now(), family_id),
+        )
+        cur = conn.execute(
+            "INSERT INTO advisor_judgment "
+            "(family_id, priorities, evidence, recommendation, validity_conditions, "
+            "status, created_at) VALUES (?, ?, ?, ?, ?, 'active', ?)",
+            (family_id,
+             json.dumps(priorities, ensure_ascii=False),
+             json.dumps(evidence, ensure_ascii=False) if evidence else None,
+             recommendation,
+             json.dumps(validity_conditions, ensure_ascii=False),
+             _now()),
+        )
+        conn.commit()
+        return int(cur.lastrowid)
+    finally:
+        conn.close()
+
+
+def latest_judgment(family_id: int) -> dict[str, Any] | None:
+    """返回最近一条顾问判断（含 stale）。JSON 字段反序列化。"""
+    rows = _rows(
+        "SELECT * FROM advisor_judgment WHERE family_id = ? ORDER BY id DESC LIMIT 1",
+        (family_id,),
+    )
+    if not rows:
+        return None
+    r = rows[0]
+    r["priorities"] = json.loads(r["priorities"]) if r["priorities"] else []
+    r["evidence"] = json.loads(r["evidence"]) if r["evidence"] else []
+    r["validity_conditions"] = (json.loads(r["validity_conditions"])
+                                if r["validity_conditions"] else {})
+    return r
 
 
 # ---------- 对话抽取动作的落地 ----------
