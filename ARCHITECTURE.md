@@ -52,7 +52,8 @@ AI 不负责：凭经验计算任何财务数字
 ```
 
 - **API v1 契约**：见 `docs/api-contract-v1.md`（已冻结）。
-- **前端架构**：见 `docs/plan-c0-frontend-architecture.md`。
+- **主路线图**：见 `docs/plan-master-roadmap.md`（唯一总纲）。
+- **主体计划（AI Advisor V2）**：见 `docs/plan-ai-advisor-core-architecture.md`。
 
 ---
 

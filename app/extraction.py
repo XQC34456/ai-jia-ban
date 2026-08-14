@@ -273,7 +273,11 @@ def _normalize_action(action: dict[str, Any]) -> dict[str, Any] | None:
 
 
 class LLMExtractor:
-    """通过 OpenAI 兼容接口做抽取。未配置 key 时不可用。"""
+    """通过 OpenAI 兼容接口做抽取。未配置 key 时不可用。
+
+    ⚠️ 当前为死代码（profile.py 已改用确定性 RuleExtractor，见 docs 审计）。
+    保留不删：AI Advisor V2.2 Tool Calling 将复用 LLM 结构化抽取能力。
+    """
 
     def __init__(self) -> None:
         self.api_key = os.environ.get("LLM_API_KEY", "")

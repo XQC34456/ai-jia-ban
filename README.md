@@ -1,8 +1,10 @@
-# AI家办 · 家庭财富智管家（MVP）
+# AI家办 · 家庭财富决策操作系统
 
-面向普通家庭的 AI 家庭财富管理操作系统 —— 第一版最小可用实现。
+面向普通家庭的 AI 家庭财富决策操作系统 —— 帮用户「看清现状 → 发现风险 → 模拟决策 → 推动行动」。
 
-**核心主链路**：对话 → 结构化建档（含确认） → 确定性计算 → 3 问题体检 → 数据化回答。
+**核心定位**：AI 顾问是产品主入口与决策中枢，其余模块（Engine / Decision / Cockpit / X-Ray / Sandbox / Data / Goals / Reports）都是顾问的能力底座和行动工具。
+
+**铁律**：财务数字一律由 Wealth Engine 确定性计算，LLM 绝不计算、绝不编造。
 
 ---
 
@@ -20,13 +22,13 @@ python -m app.main
 uvicorn app.main:app --reload
 ```
 
-浏览器打开 `http://127.0.0.1:8000`，即可对话建档。
+浏览器打开 `http://127.0.0.1:8000`。
 
 ---
 
 ## 接入 DeepSeek（可选，强烈建议）
 
-产品默认用**内置规则兜底**，开箱即用但抽取/回答较机械。接入 DeepSeek 后，抽取走 function calling、回答走 LLM。
+产品默认用**确定性规则兜底**，开箱即用。接入 DeepSeek 后，意图路由兜底与场景参数抽取走 LLM。
 
 1. 复制 `.env.example` 为 `.env`
 2. 填入你的 key：
@@ -38,9 +40,11 @@ LLM_BASE_URL=https://api.deepseek.com
 LLM_MODEL=deepseek-chat
 ```
 
-3. 重启服务。右上角会显示「AI 引擎：已接入大模型」。
+3. 重启服务。
 
 > 换豆包/通义/GLM 等 OpenAI 兼容接口，改 `LLM_BASE_URL` 和 `LLM_MODEL` 即可。
+
+> **现状说明**：AI 顾问当前为 Level 0（确定性引擎 + LLM 做意图路由/参数抽取），回答仍是确定性模板。核心工程「AI Advisor V2」（让 AI 顾问真正理解家庭、调用工具、做决策）见 [docs/plan-ai-advisor-core-architecture.md](docs/plan-ai-advisor-core-architecture.md)。
 
 ---
 
@@ -49,6 +53,9 @@ LLM_MODEL=deepseek-chat
 ```bash
 # Windows 需带编码环境变量，否则中文输出乱码
 PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python -m pytest -q
+
+# 前端解释层单测
+node --test tests/js/humanize.test.js tests/js/scenario-interpret.test.js
 ```
 
 ---
@@ -56,19 +63,23 @@ PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python -m pytest -q
 ## 架构
 
 ```
-接入层       Web H5（static/，Vue 3 单页 App Shell + hash 路由，8 视图）
+接入层       Web H5（static/，Vue 3 单页 App Shell + hash 路由，9 视图）
    ↓
 AI 顾问层   app/agent/    converse() 统一入口 → 建档吸收(确认卡片) / 七意图路由 → 结构化响应
    ↓
-抽取层       app/extraction.py  规则 / LLM(function calling) 可插拔
+抽取层       app/extraction.py  规则抽取（RuleExtractor，确定性；LLM 抽取留待 V2.2）
    ↓
-计算引擎层   app/calc_engine.py 资产负债/现金流/储蓄率/应急月数/安全边际（纯函数）
-体检层       app/health.py      「最值得关注的 3 个问题」规则引擎
+服务编排层   app/services/  build_overview / build_goals / compare_scenarios（编排，不重算）
    ↓
-数据层       app/db.py       SQLite：users/family/person/asset/liability/cashflow/goal/reminder
+判断层       app/decision/  7 类问题检测 + 四象限 + P0/P1/P2（确定性规则）
+计算引擎层   app/engine/    metrics / allocation / projection / scenario / goals / score（纯函数）
+   ↓
+数据层       app/db.py      SQLite：users/family/person/asset/liability/cashflow/goal/reminder/insurance
 ```
 
-**关键设计**：财务数字一律由 `calc_engine.py` 的纯函数计算，绝不交给 LLM；LLM 只做「听懂」和「说人话」。
+**关键设计**：财务数字一律由 `app/engine/` 的纯函数计算，绝不交给 LLM；LLM 只做「听懂」和「说人话」。
+
+> 完整分层与铁律见 [ARCHITECTURE.md](ARCHITECTURE.md)；冻结契约见 [docs/api-contract-v1.md](docs/api-contract-v1.md)。
 
 ---
 
@@ -102,20 +113,26 @@ AI 顾问层   app/agent/    converse() 统一入口 → 建档吸收(确认卡�
 
 ## 已完成
 
-- 统一 App Shell（`/` 单页 + hash 路由：Sidebar 8 项 + Topbar + 主内容区）
-- 8 个视图：家庭总览 / 财富健康 / 资产配置 / 退休规划 / 家庭目标 / 风险问题 / 情景沙盘 / AI 顾问
+- 统一 App Shell（`/` 单页 + hash 路由：Sidebar 9 项 + Topbar + 主内容区）
+- 9 个视图：家庭总览 / 家庭数据 / 财富健康 / 资产配置 / 退休规划 / 家庭目标 / 风险问题 / 情景沙盘 / AI 顾问
 - 家庭总览：财富评分 / 净资产 / 资产配置 / 现金流 / 流动性 / 债务 / 保障 / 养老 + AI 主动洞察（确定性 `build_issues`，非 LLM）
 - 情景沙盘：买房 / 提前还贷 / 投资 / 收入变化，1~3 方案对比（VIP）
 - 深度报告（LLM 建议 + 打印导出 PDF，VIP）
 - 决策模拟器（买房 / 提前还贷，VIP）
 - 登录 + VIP 分层（免费=对话建档 + 体检 + 目标 + 问题 + 各只读视图；VIP=报告 + 决策 + 情景沙盘；模拟开通按钮）
 - 家庭数据管理（成员/收入/支出/资产/负债/目标 的查看·新增·编辑·删除，纯读写不计算）
-- AI 顾问统一收口（`/api/chat` 退役；`/api/agent/chat` 唯一入口；建档确认吸收进 Agent；CHECK_ISSUES/CHECK_GOALS/EXPLAIN_RESULT 由 `build_issues`/`build_goals` 确定性产出，非 LLM 编造）
+- AI 顾问统一收口（`/api/chat` 退役；`/api/agent/chat` 唯一入口；建档确认吸收进 Agent；CHECK_ISSUES/CHECK_GOALS/EXPLAIN_RESULT 由 `build_issues`/`build_goals` 确定性产出）
+- 人性化落地（体检报告横幅 / 「为什么」自然语言解释 / 「模拟」按钮跳沙盘 / 沙盘模式提示 / 冷启动向导）
 
-## 下一步（V2/V3）
+## 下一步：AI Advisor V2（核心工程）
 
-- 注册即送 1 天 VIP 试用（`users.vip_expires_at` 字段已预留，改注册逻辑 + 到期检查即可）
-- 接入真实支付（替换 `/api/upgrade` 模拟路由）
-- 家庭安全边际升级为完整指标
-- 目标系统深化（教育/养老/买房缺口 + 每月需存测算）
-- 多成员数据权限
+AI 顾问从 Level 0（确定性引擎 + LLM 分类器）升级为 Level 5（能持续「理解 → 数据 → 推理 → 模拟 → 决策」的财富 Agent）：
+
+- **V2.1 Context Engine** — 让 AI 看见家庭数据
+- **V2.2 Tool Calling** — 给 AI 只读工具（Engine 已就绪，只需暴露）
+- **V2.3 Advisor Brain** — 状态机 + 六步 SOP + 修复「为什么」死分支
+- **V2.4 Conversation Memory** — 多轮记忆
+- **V2.5 Proactive Advisor** — 主动提醒（后期，需调度器）
+- **V2.6 Action Loop** — 推动行动
+
+> 详见 [docs/plan-ai-advisor-core-architecture.md](docs/plan-ai-advisor-core-architecture.md)（唯一主体计划）。
