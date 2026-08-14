@@ -17,6 +17,14 @@ class LLMProvider(Protocol):
                       context: str | None = None) -> dict | None:
         ...
 
+    def chat(self, messages: list[dict], tools: list[dict] | None = None) -> dict | None:
+        """真实 function calling 多轮对话；失败/超时返回 None。
+
+        返回 {"content": str | None, "tool_calls": [{"id", "name", "arguments"}]}
+        或 None（失败降级）。
+        """
+        ...
+
 
 class NullProvider:
     """永远返回 None → Runtime 走纯确定性回退，不产生任何 LLM 内容。"""
@@ -25,13 +33,23 @@ class NullProvider:
                       context: str | None = None) -> dict | None:
         return None
 
+    def chat(self, messages: list[dict], tools: list[dict] | None = None) -> dict | None:
+        return None
+
 
 class FakeLLMProvider:
-    """按脚本顺序返回预置结构化输出；脚本耗尽返回 None（测试专用）。"""
+    """按脚本顺序返回预置结构化输出；脚本耗尽返回 None（测试专用）。
 
-    def __init__(self, script: list[dict] | None = None):
+    complete_json 用 script 驱动；chat 用 chat_script 驱动（元素为 chat 返回 dict）。
+    chat_messages 记录每次 chat 的 messages，供测试断言工具结果是否回传。
+    """
+
+    def __init__(self, script: list[dict] | None = None,
+                 chat_script: list[dict] | None = None):
         self._script = list(script or [])
+        self._chat_script = list(chat_script or [])
         self.last_context: str | None = None
+        self.chat_messages: list[list[dict]] = []
 
     def complete_json(self, system: str, user: str, schema: dict,
                       context: str | None = None) -> dict | None:
@@ -39,3 +57,9 @@ class FakeLLMProvider:
         if not self._script:
             return None
         return self._script.pop(0)
+
+    def chat(self, messages: list[dict], tools: list[dict] | None = None) -> dict | None:
+        self.chat_messages.append(list(messages))
+        if not self._chat_script:
+            return None
+        return self._chat_script.pop(0)

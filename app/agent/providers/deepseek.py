@@ -61,3 +61,42 @@ class DeepSeekProvider:
             return data if isinstance(data, dict) else None
         except Exception:
             return None
+
+    def chat(self, messages: list[dict], tools: list[dict] | None = None) -> dict | None:
+        """真实 function calling 多轮对话，符合 LLMProvider Protocol。
+
+        注意：DeepSeek tool calling 与 response_format=json_object 互斥，故本方法
+        不设 response_format；最终无 tool_calls 时的 content 由上层（advisor）解析。
+        返回 {"content": str | None, "tool_calls": [{"id", "name", "arguments"}]}
+        或 None（HTTP 错误/超时）。
+        """
+        payload: dict = {"model": self._model, "messages": messages}
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+        try:
+            resp = httpx.post(
+                f"{self._base_url.rstrip('/')}/v1/chat/completions",
+                headers={"Authorization": f"Bearer {self._api_key}"},
+                json=payload,
+                timeout=self._timeout,
+            )
+            resp.raise_for_status()
+            msg = resp.json()["choices"][0]["message"]
+            content = msg.get("content") or None
+            tool_calls: list[dict] = []
+            for call in msg.get("tool_calls") or []:
+                try:
+                    args = json.loads(call["function"]["arguments"])
+                    if not isinstance(args, dict):
+                        args = {}
+                except (KeyError, json.JSONDecodeError):
+                    args = {}
+                tool_calls.append({
+                    "id": call.get("id"),
+                    "name": call["function"]["name"],
+                    "arguments": args,
+                })
+            return {"content": content, "tool_calls": tool_calls}
+        except Exception:
+            return None
