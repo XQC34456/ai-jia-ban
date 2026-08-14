@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from .. import db
 
-__all__ = ["record_turn", "build_conversation_summary"]
+__all__ = ["record_turn", "build_conversation_summary", "record_fact", "is_safe_fact_value"]
 
 # 短期对话记忆限量（轮数，一轮 = user + assistant 两条）
 CONVERSATION_WINDOW = 5
@@ -39,3 +39,21 @@ def build_conversation_summary(family_id: int, n: int = CONVERSATION_WINDOW) -> 
             intent = r.get("intent") or "?"
             lines.append(f"AI({intent}):「{r['message']}」")
     return "\n".join(lines)
+
+
+def is_safe_fact_value(value: str, source: str) -> bool:
+    """数字防编造闸：inferred 事实的 value 含数字 → False。
+
+    推断（LLM 猜测）不产生财富数字；数字必须溯源（确认建档的确定性抽取），
+    否则拒绝写入。source='chat_confirmed'（确定性来源）允许数字。
+    """
+    if source == "inferred" and any(ch.isdigit() for ch in str(value)):
+        return False
+    return True
+
+
+def record_fact(family_id: int, key: str, value: str, source: str, confidence: str) -> int | None:
+    """写一条家庭事实（带数字防编造闸）。不安全 → 不写入，返回 None。"""
+    if not is_safe_fact_value(value, source):
+        return None
+    return db.upsert_fact(family_id, key, value, source, confidence)

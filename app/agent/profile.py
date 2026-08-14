@@ -12,6 +12,7 @@ from typing import Any
 from .. import db
 from ..extraction import RuleExtractor
 from ..schemas.agent import AppliedResponse, ConfirmCard
+from .memory import record_fact
 
 _PENDING: dict[str, dict[str, Any]] = {}
 
@@ -45,5 +46,11 @@ def apply_confirmation(family_id: int, pending_id: str, confirmed: bool) -> Appl
         return AppliedResponse(type="discarded", message="好的，已忽略，没有改动你的档案。")
     for action in pending["actions"]:
         db.apply_action(family_id, action)
+        # 顾问知识类事实（目标）写记忆层：版本化记录目标历史，检测目标变化。
+        # 净值事实（income/expense/asset/liability）只写 db 主表，不进 memory_fact。
+        if action["kind"] == "goal":
+            gtype = action.get("fields", {}).get("type", "其他")
+            record_fact(family_id, f"goal:{gtype}", action["summary"],
+                        source="chat_confirmed", confidence="confirmed")
     joined = "、".join(a["summary"] for a in pending["actions"])
     return AppliedResponse(type="applied", message=f"已记录：{joined}。")
