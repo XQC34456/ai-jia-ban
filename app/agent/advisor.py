@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 
 from ..schemas.agent import AgentResponse
+from .memory import record_judgment
 from .provider import LLMProvider
 from .response import assemble_advisor_response
 from .tool_schemas import TOOL_SCHEMAS, execute_tool
@@ -154,4 +155,6 @@ def advise(user: dict, message: str, llm: LLMProvider,
                                          status="need_clarification")
         return resp.model_copy(update={"summary": clarify})
 
-    return assemble_advisor_response(tool_results, llm_json, intent, status="ok")
+    resp = assemble_advisor_response(tool_results, llm_json, intent, status="ok")
+    record_judgment(user, resp)
+    return resp

@@ -439,6 +439,22 @@ def _build_priorities(tool_results: list[dict]) -> list[PriorityRef]:
     return []
 
 
+def build_validity_conditions(overview: dict) -> dict:
+    """从 overview 提取判断有效条件快照（固定最小集指标值）。
+
+    只取「判断成立所依赖的关键事实」：cashflow_surplus/dti/liquidity_months/
+    rfr/real_estate_pct。供记忆层失效检测逐 key 对比（Task 4）。取值器与
+    _EVIDENCE_SPECS 同源，保证「判断依据」和「有效条件」用同一套取数口径。
+    """
+    conds = {}
+    for key in ("cashflow_surplus", "dti", "liquidity_months", "rfr", "real_estate_pct"):
+        _, _, _, getter = _EVIDENCE_SPECS[key]
+        v = getter({"overview": overview})
+        if v is not None:
+            conds[key] = v
+    return conds
+
+
 def _build_tradeoffs(tradeoffs_raw: list) -> list[TradeoffRef]:
     """把 LLM 的 tradeoffs（option/gain/loss）转成 TradeoffRef。
 

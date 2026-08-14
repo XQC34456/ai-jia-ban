@@ -9,8 +9,11 @@
 from __future__ import annotations
 
 from .. import db
+from ..services import build_overview
+from .response import build_validity_conditions
 
-__all__ = ["record_turn", "build_conversation_summary", "record_fact", "is_safe_fact_value"]
+__all__ = ["record_turn", "build_conversation_summary", "record_fact",
+           "is_safe_fact_value", "record_judgment"]
 
 # 短期对话记忆限量（轮数，一轮 = user + assistant 两条）
 CONVERSATION_WINDOW = 5
@@ -57,3 +60,24 @@ def record_fact(family_id: int, key: str, value: str, source: str, confidence: s
     if not is_safe_fact_value(value, source):
         return None
     return db.upsert_fact(family_id, key, value, source, confidence)
+
+
+def record_judgment(user: dict, resp) -> int | None:
+    """把顾问判断（主要矛盾 + 依据 + 有效条件快照）写入判断记忆。
+
+    - 只有 status=ok 且产出 priorities 才是「完整判断」，refuse/need_clarification 不写。
+    - validity_conditions 主动 build_overview 提取当前关键值快照（不依赖 LLM 调了啥）。
+    - 数字/依据直接序列化 V2.3 的 PriorityRef/EvidenceRef，不经过 LLM 二次加工。
+    """
+    if resp.status != "ok" or not resp.priorities:
+        return None
+    data = db.dump_family(user["family_id"])
+    overview = build_overview(data)
+    conditions = build_validity_conditions(overview)
+    return db.save_judgment(
+        user["family_id"],
+        priorities=[p.model_dump() for p in resp.priorities],
+        evidence=[e.model_dump() for e in resp.evidence],
+        recommendation=resp.summary,
+        validity_conditions=conditions,
+    )
