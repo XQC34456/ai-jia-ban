@@ -516,6 +516,19 @@ def latest_judgment(family_id: int) -> dict[str, Any] | None:
     return r
 
 
+def invalidate_judgment(judgment_id: int) -> None:
+    """把指定判断标记为 stale（失效），记录 invalidated_at。"""
+    conn = get_conn()
+    try:
+        conn.execute(
+            "UPDATE advisor_judgment SET status = 'stale', invalidated_at = ? WHERE id = ?",
+            (_now(), judgment_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 # ---------- 对话抽取动作的落地 ----------
 
 def apply_action(family_id: int, action: dict[str, Any]) -> None:

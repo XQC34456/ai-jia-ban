@@ -13,7 +13,7 @@ from ..services import build_overview
 from .response import build_validity_conditions
 
 __all__ = ["record_turn", "build_conversation_summary", "record_fact",
-           "is_safe_fact_value", "record_judgment"]
+           "is_safe_fact_value", "record_judgment", "detect_invalidation"]
 
 # 短期对话记忆限量（轮数，一轮 = user + assistant 两条）
 CONVERSATION_WINDOW = 5
@@ -81,3 +81,25 @@ def record_judgment(user: dict, resp) -> int | None:
         recommendation=resp.summary,
         validity_conditions=conditions,
     )
+
+
+def detect_invalidation(family_id: int) -> list[dict]:
+    """确定性检测最近 active 判断是否失效（当前状态 vs validity_conditions 逐 key 对比）。
+
+    任一依赖值变化 → 标记 stale，返回变化清单 [{key, before, after}]。
+    无 active 判断 / 无变化 → 空列表。失效检测由确定性代码完成，绝不由 LLM 判断。
+    """
+    j = db.latest_judgment(family_id)
+    if j is None or j["status"] != "active":
+        return []
+    data = db.dump_family(family_id)
+    current = build_validity_conditions(build_overview(data))
+    conds = j["validity_conditions"] or {}
+    changed = []
+    for k, before in conds.items():
+        after = current.get(k)
+        if after is not None and after != before:
+            changed.append({"key": k, "before": before, "after": after})
+    if changed:
+        db.invalidate_judgment(j["id"])
+    return changed
