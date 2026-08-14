@@ -13,7 +13,8 @@ from ..services import build_overview
 from .response import build_validity_conditions
 
 __all__ = ["record_turn", "build_conversation_summary", "record_fact",
-           "is_safe_fact_value", "record_judgment", "detect_invalidation"]
+           "is_safe_fact_value", "record_judgment", "detect_invalidation",
+           "build_memory_context"]
 
 # 短期对话记忆限量（轮数，一轮 = user + assistant 两条）
 CONVERSATION_WINDOW = 5
@@ -103,3 +104,36 @@ def detect_invalidation(family_id: int) -> list[dict]:
     if changed:
         db.invalidate_judgment(j["id"])
     return changed
+
+
+def build_memory_context(family_id: int,
+                         conversation_turns: int = CONVERSATION_WINDOW) -> str:
+    """合成三层记忆摘要（L1 近期对话 + L2 家庭事实 + L3 最近判断），注入 advisor。
+
+    纯函数、零 LLM、零财富计算——只「搬运」已落库的记忆，绝不编数字、绝不参与计算。
+    限量：L1 固定最近 N 轮、L2 只当前有效、L3 只最近 1 次判断。空记忆 → 空串。
+    失效判断（status=stale）附「已失效」提示（由 detect_invalidation 确定性标记）。
+    """
+    parts: list[str] = []
+
+    conv = build_conversation_summary(family_id, conversation_turns)
+    if conv:
+        parts.append(f"【近期对话】\n{conv}")
+
+    facts = db.current_facts(family_id)
+    if facts:
+        lines = [f"· {f['key']} = {f['value']}（source={f['source']}, v{f['version']}）"
+                 for f in facts]
+        parts.append("【已确认的家庭事实】\n" + "\n".join(lines))
+
+    j = db.latest_judgment(family_id)
+    if j is not None:
+        lines = ["· 主要矛盾：" + "、".join(
+            p.get("title") or p.get("issue_id", "") for p in j["priorities"])]
+        if j["recommendation"]:
+            lines.append(f"· 上次建议：{j['recommendation']}")
+        if j["status"] == "stale":
+            lines.append("⚠️ 上次判断已失效：判断依赖的关键数据已变化，请重新评估")
+        parts.append("【上次判断】\n" + "\n".join(lines))
+
+    return "\n\n".join(parts)

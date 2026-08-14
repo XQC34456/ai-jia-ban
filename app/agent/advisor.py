@@ -61,10 +61,13 @@ _ADVISOR_SYSTEM = (
 )
 
 
-def _messages_with_context(message: str, wealth_context: str | None) -> list[dict]:
+def _messages_with_context(message: str, wealth_context: str | None,
+                           memory_context: str | None = None) -> list[dict]:
     system = _ADVISOR_SYSTEM
     if wealth_context:
         system = f"{system}\n\n【家庭背景】\n{wealth_context}"
+    if memory_context:
+        system = f"{system}\n\n【记忆】\n{memory_context}"
     return [
         {"role": "system", "content": system},
         {"role": "user", "content": message},
@@ -72,13 +75,14 @@ def _messages_with_context(message: str, wealth_context: str | None) -> list[dic
 
 
 def run_advisor(user: dict, message: str, llm: LLMProvider,
-                wealth_context: str | None = None) -> dict | None:
+                wealth_context: str | None = None,
+                memory_context: str | None = None) -> dict | None:
     """tool_loop 多轮循环：LLM 选工具 → execute_tool → 结果回传 → 第二轮推理。
 
     返回 {"tool_results": [{"name", "result"}], "content": str | None} 或 None（降级）。
     tool_results 按调用顺序记录（同名工具多次调用各自保留）。
     """
-    messages = _messages_with_context(message, wealth_context)
+    messages = _messages_with_context(message, wealth_context, memory_context)
     tool_results: list[dict] = []
 
     for _ in range(MAX_ROUNDS):
@@ -132,12 +136,14 @@ def _parse_json(content: str | None) -> dict | None:
 
 def advise(user: dict, message: str, llm: LLMProvider,
            wealth_context: str | None = None,
+           memory_context: str | None = None,
            intent: str = "VIEW_OVERVIEW") -> AgentResponse | None:
     """编排 advisor 完整流程：run_advisor → 解析 → refuse/missing → 组装。
 
     返回 AgentResponse，或 None（LLM 失败 / content 无法解析 → 上层确定性兜底）。
     """
-    raw = run_advisor(user, message, llm, wealth_context=wealth_context)
+    raw = run_advisor(user, message, llm, wealth_context=wealth_context,
+                      memory_context=memory_context)
     if raw is None:
         return None
     llm_json = _parse_json(raw.get("content"))

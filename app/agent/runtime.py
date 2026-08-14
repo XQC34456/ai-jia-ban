@@ -40,7 +40,8 @@ _DISAMBIGUATE_SUMMARY = (
 
 
 def handle(message: str, user: dict, llm: LLMProvider | None = None,
-           context: dict | None = None, wealth_context: str | None = None) -> AgentResponse:
+           context: dict | None = None, wealth_context: str | None = None,
+           memory_context: str | None = None) -> AgentResponse:
     """编排一次完整交互：拒算门 → 意图路由 → 参数提取 → 工具分派 → 组装响应。"""
     # ① 拒算门（优先于普通意图路由）
     refusal = refusal_gate(message)
@@ -50,7 +51,7 @@ def handle(message: str, user: dict, llm: LLMProvider | None = None,
             # 无 LLM 或失败 → 回退确定性反问。
             if llm is not None:
                 resp = advise(user, message, llm, wealth_context=wealth_context,
-                              intent="VIEW_OVERVIEW")
+                              memory_context=memory_context, intent="VIEW_OVERVIEW")
                 if resp is not None:
                     return resp
             return build_response("EXPLAIN_RESULT", "need_clarification", None,
@@ -65,7 +66,8 @@ def handle(message: str, user: dict, llm: LLMProvider | None = None,
     #    有 LLM 能力时「顾问」接管，失败 / 无 LLM → 回退确定性 dispatch（③④⑤）。
     #    EXPLAIN_RESULT 也走 advisor_path，单轮内由 LLM 调工具解释（跨轮上下文留 V2.4）。
     if llm is not None:
-        resp = advise(user, message, llm, wealth_context=wealth_context, intent=intent)
+        resp = advise(user, message, llm, wealth_context=wealth_context,
+                      memory_context=memory_context, intent=intent)
         if resp is not None:
             return resp
 

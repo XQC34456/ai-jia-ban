@@ -8,7 +8,7 @@ from __future__ import annotations
 from .. import db
 from ..schemas.agent import AgentResponse, ConfirmCard
 from .context import build_wealth_context, context_to_text
-from .memory import record_turn
+from .memory import build_memory_context, detect_invalidation, record_turn
 from .profile import create_confirm, extract_actions
 from .provider import LLMProvider
 from .runtime import handle
@@ -26,7 +26,10 @@ def converse(message: str, user: dict, llm: LLMProvider | None = None,
     if actions:
         return create_confirm(user["family_id"], actions)
     wealth_context = _wealth_context_text(user)
-    result = handle(message, user, llm=llm, context=context, wealth_context=wealth_context)
+    detect_invalidation(user["family_id"])          # 先确定性失效检测（标记 stale）
+    memory_context = build_memory_context(user["family_id"])
+    result = handle(message, user, llm=llm, context=context, wealth_context=wealth_context,
+                    memory_context=memory_context)
     record_turn(user["family_id"], message, result)
     return result
 
