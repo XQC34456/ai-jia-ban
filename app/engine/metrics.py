@@ -267,4 +267,5 @@ def snapshot(family_data: dict[str, Any]) -> dict[str, Any]:
         "goals": goals_summary(goals),
         "goals_funding": goals_funding(goals, monthly_surplus(cashflows, liabilities)),
         "safety_margin": safety_margin(assets, liabilities, cashflows),
+        # ⚠️ 上两字段为 Engine 内部中间量：build_overview 未暴露；V2.1 Context 不消费，勿误当死字段删除
     }

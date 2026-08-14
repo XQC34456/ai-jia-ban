@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS person (
     name TEXT NOT NULL,
     relation TEXT,               -- 本人/配偶/子女/老人/其他
     birth_year INTEGER,
-    monthly_income REAL,
+    monthly_income REAL,         -- ⚠️ 遗留双口径：收入真相源是 cashflow(flow_type=income)；Engine 只读 cashflow，V2.1 Context 统一从 build_overview.cashflow.income 取，勿读此列
     job TEXT,
     FOREIGN KEY(family_id) REFERENCES family(id)
 );
