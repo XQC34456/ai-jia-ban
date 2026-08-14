@@ -133,11 +133,10 @@ def upgrade(user: dict = Depends(get_current_user)):
 def get_family(user: dict = Depends(get_current_user)):
     data = db.dump_family(user["family_id"])
     from . import calc_engine as ce
-    from .health import health_check
     return {
         "data": data,
         "snapshot": ce.snapshot(data),
-        "problems": health_check(data),
+        "problems": decision.build_problems(data),
     }
 
 

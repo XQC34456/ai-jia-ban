@@ -10,14 +10,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from .issue import build_issues, compute_context
+from .issue import build_issues, build_problems, compute_context
 from .quadrant import retirement_quadrant
 
 from .. import calc_engine as ce
 from .. import db
 from ..engine.scenario import run_scenario
 
-__all__ = ["build_issues", "compute_context", "retirement_quadrant", "simulate"]
+__all__ = ["build_issues", "build_problems", "compute_context", "retirement_quadrant", "simulate"]
 
 
 def simulate(family_id: int, scenario: str, params: dict[str, Any]) -> dict[str, Any]:

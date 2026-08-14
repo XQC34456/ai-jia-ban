@@ -12,7 +12,7 @@ from typing import Any
 
 from . import calc_engine as ce
 from . import db
-from .health import health_check
+from .decision import build_problems
 
 
 def _asset_allocation(assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -35,7 +35,7 @@ def _asset_allocation(assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def build_report(family_id: int) -> dict[str, Any]:
     data = db.dump_family(family_id)
     snap = ce.snapshot(data)
-    problems = health_check(data)
+    problems = build_problems(data)
 
     members = [{
         "name": p.get("name"),

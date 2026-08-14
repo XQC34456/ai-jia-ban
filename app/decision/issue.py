@@ -5,7 +5,7 @@ from .context import compute_context
 from .detect import DETECTORS
 from .priority import rank
 
-__all__ = ["build_issues", "compute_context"]
+__all__ = ["build_issues", "build_problems", "compute_context"]
 
 
 def build_issues(family_data: dict, ctx: dict | None = None) -> dict:
@@ -48,3 +48,27 @@ def build_issues(family_data: dict, ctx: dict | None = None) -> dict:
         "priorities": priorities,
         "recommendations": recommendations,
     }
+
+
+_SEVERITY_MAP = {"P0": 5, "P1": 3, "P2": 2}
+
+
+def build_problems(family_data: dict, ctx: dict | None = None) -> list[dict]:
+    """兼容旧 /api/family、/api/report 的扁平问题列表（纯 shape 映射）。
+
+    只做转换：P0/P1/P2 → 5/3/2、finding → why、recommendations[0].detail → advice。
+    绝不新增/删减问题、不重算 severity、不重新生成建议——财富判断的唯一真相是
+    build_issues，这里只是给 report/family 的呈现层拍平。
+    """
+    result = build_issues(family_data, ctx)
+    problems: list[dict] = []
+    for i in result["issues"]:
+        recs = i.get("recommendations") or []
+        advice = recs[0]["detail"] if recs else i.get("finding", "")
+        problems.append({
+            "severity": _SEVERITY_MAP.get(i.get("severity"), 2),
+            "title": i["title"],
+            "why": i.get("finding", ""),
+            "advice": advice,
+        })
+    return problems
