@@ -1,0 +1,6 @@
+{
+  "name": "ai-jia-ban",
+  "private": true,
+  "type": "module",
+  "description": "前端 ES module 解释层的 Node 单测底座（仅供 node --test 使用，不参与浏览器打包）"
+}
