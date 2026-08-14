@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 
-from ..schemas.agent import AgentResponse, MetricRef
+from ..schemas.agent import AgentResponse, EvidenceRef, MetricRef
 
 __all__ = ["build_metrics", "known_limitations_of", "build_response",
            "assemble_advisor_response"]
@@ -321,6 +321,89 @@ def _strip_numeric_list(items: list | None) -> list[str]:
     for it in items or []:
         if isinstance(it, str) and not _DIGIT_RE.search(it):
             out.append(it)
+    return out
+
+
+# ---------- V2.3 数字引用机制（evidence：claim 定性 + metric_key 引用，数字系统注入） ----------
+
+def _pick(result: dict, *paths) -> float | None:
+    """从 tool 结果按多候选路径取第一个非 None 数值（子块直挂 / overview.子块 两种结构）。"""
+    for path in paths:
+        v = result
+        for seg in path:
+            if not isinstance(v, dict):
+                v = None
+                break
+            v = v.get(seg)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return v
+    return None
+
+
+# 稳定 metric_key → (label, unit, source 规范路径, 取值器)。source 一律用 overview 规范路径，
+# 因为所有证据指标最终都源于 build_overview（get_retirement/allocation/cashflow 只是读其子块）。
+_EVIDENCE_SPECS = {
+    "wealth_score": ("财富评分", "score", "overview.wealth_score",
+                     lambda r: _pick(r, ("overview", "wealth_score"))),
+    "net_worth": ("净资产", "money", "overview.net_worth",
+                  lambda r: _pick(r, ("overview", "net_worth"))),
+    "dti": ("负债率 DTI", "pct", "overview.debt.dti",
+            lambda r: _pick(r, ("overview", "debt", "dti"))),
+    "cashflow_surplus": ("月度结余", "money", "overview.cashflow.surplus",
+                         lambda r: _pick(r, ("overview", "cashflow", "surplus"),
+                                         ("cashflow", "surplus"))),
+    "savings_rate": ("储蓄率", "pct", "overview.cashflow.savings_rate",
+                     lambda r: _pick(r, ("overview", "cashflow", "savings_rate"),
+                                     ("cashflow", "savings_rate"))),
+    "liquidity_months": ("应急资金（月）", "months", "overview.liquidity.emergency_months",
+                         lambda r: _pick(r, ("overview", "liquidity", "emergency_months"))),
+    "rfr": ("养老可投资覆盖", "ratio", "overview.retirement.rfr",
+            lambda r: _pick(r, ("overview", "retirement", "rfr"), ("retirement", "rfr"))),
+    "nwc": ("养老净资产覆盖", "ratio", "overview.retirement.nwc",
+            lambda r: _pick(r, ("overview", "retirement", "nwc"), ("retirement", "nwc"))),
+    "real_estate_pct": ("房产占比", "pct", "overview.asset_allocation.classes.real_estate.pct",
+                        lambda r: _pick(r, ("overview", "asset_allocation", "classes", "real_estate", "pct"),
+                                        ("asset_allocation", "classes", "real_estate", "pct"))),
+}
+
+
+def _build_evidence(tool_results: list[dict], evidence_raw: list) -> list[EvidenceRef]:
+    """把 LLM 的 evidence 引用（claim + metric_key）转成 EvidenceRef（数字系统注入 + source）。
+
+    三重硬闸：
+    - metric_key 不在白名单 → 丢弃（LLM 自由造 key = 编造）
+    - claim 含数字 → 丢弃（claim 必须定性，数字只来自 metric）
+    - 白名单 key 在 tool_results 里取不到数值 → 丢弃（引用不存在的数字 = 编造）
+    """
+    if not isinstance(evidence_raw, list):
+        return []
+    out: list[EvidenceRef] = []
+    for item in evidence_raw:
+        if not isinstance(item, dict):
+            continue
+        claim = item.get("claim")
+        mkey = item.get("metric_key")
+        if not claim or not isinstance(claim, str) or not isinstance(mkey, str):
+            continue
+        if _DIGIT_RE.search(claim):
+            continue
+        spec = _EVIDENCE_SPECS.get(mkey)
+        if spec is None:
+            continue
+        label, unit, source, getter = spec
+        value = None
+        for tr in tool_results or []:
+            result = tr.get("result")
+            if not isinstance(result, dict):
+                continue
+            value = getter(result)
+            if value is not None:
+                break
+        if value is None:
+            continue
+        out.append(EvidenceRef(claim=claim,
+                               metric=MetricRef(key=mkey, label=label, unit=unit,
+                                                value=value, source=source)))
     return out
 
 
