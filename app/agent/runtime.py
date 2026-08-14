@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 from ..schemas.agent import AgentResponse
+from .advisor import advise
 from .dispatch import dispatch
 from .errors import map_tool_error
 from .params import extract_scenario_params
@@ -45,6 +46,13 @@ def handle(message: str, user: dict, llm: LLMProvider | None = None,
     refusal = refusal_gate(message)
     if refusal is not None:
         if refusal.get("disambiguate"):
+            # 意图消歧：有 LLM 走 advisor_path（知识问答 / 纯计算拒绝 / 家庭影响），
+            # 无 LLM 或失败 → 回退确定性反问。
+            if llm is not None:
+                resp = advise(user, message, llm, wealth_context=wealth_context,
+                              intent="VIEW_OVERVIEW")
+                if resp is not None:
+                    return resp
             return build_response("EXPLAIN_RESULT", "need_clarification", None,
                                   summary=_DISAMBIGUATE_SUMMARY)
         intent = "SCENARIO_COMPARE"
@@ -53,7 +61,14 @@ def handle(message: str, user: dict, llm: LLMProvider | None = None,
         intent = route_intent(message, llm, wealth_context=wealth_context)
         hint = None
 
-    # ② SCENARIO_COMPARE：参数提取 + 分派
+    # ② advisor_path：非 EXPLAIN_RESULT 意图先走顾问式 tool_loop（LLM 为插件）。
+    #    有 LLM 能力时「顾问」接管，失败 / 无 LLM → 回退确定性 dispatch（③④⑤）。
+    if intent != "EXPLAIN_RESULT" and llm is not None:
+        resp = advise(user, message, llm, wealth_context=wealth_context, intent=intent)
+        if resp is not None:
+            return resp
+
+    # ③ SCENARIO_COMPARE：确定性参数提取 + 分派（advisor_path 降级兜底）
     if intent == "SCENARIO_COMPARE":
         pr = extract_scenario_params(message, llm, scenario_hint=hint)
         if pr.missing or pr.error:
