@@ -31,12 +31,15 @@ class DeepSeekProvider:
         self._base_url = base_url
         self._timeout = timeout
 
-    def complete_json(self, system: str, user: str, schema: dict) -> dict | None:
+    def complete_json(self, system: str, user: str, schema: dict,
+                      context: str | None = None) -> dict | None:
         schema_str = json.dumps(schema, ensure_ascii=False)
         full_system = (
             f"{system}\n\n你必须只输出一个 JSON 对象，严格符合以下 JSON Schema，"
             f"不要输出任何 JSON 之外的文字：\n{schema_str}"
         )
+        if context:
+            full_system = f"{full_system}\n\n【家庭背景】\n{context}"
         payload = {
             "model": self._model,
             "messages": [

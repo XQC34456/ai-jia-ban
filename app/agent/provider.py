@@ -13,14 +13,16 @@ __all__ = ["LLMProvider", "NullProvider", "FakeLLMProvider"]
 class LLMProvider(Protocol):
     """一次受 JSON-schema 约束的结构化补全；失败/超时返回 None。"""
 
-    def complete_json(self, system: str, user: str, schema: dict) -> dict | None:
+    def complete_json(self, system: str, user: str, schema: dict,
+                      context: str | None = None) -> dict | None:
         ...
 
 
 class NullProvider:
     """永远返回 None → Runtime 走纯确定性回退，不产生任何 LLM 内容。"""
 
-    def complete_json(self, system: str, user: str, schema: dict) -> dict | None:
+    def complete_json(self, system: str, user: str, schema: dict,
+                      context: str | None = None) -> dict | None:
         return None
 
 
@@ -29,8 +31,11 @@ class FakeLLMProvider:
 
     def __init__(self, script: list[dict] | None = None):
         self._script = list(script or [])
+        self.last_context: str | None = None
 
-    def complete_json(self, system: str, user: str, schema: dict) -> dict | None:
+    def complete_json(self, system: str, user: str, schema: dict,
+                      context: str | None = None) -> dict | None:
+        self.last_context = context
         if not self._script:
             return None
         return self._script.pop(0)
