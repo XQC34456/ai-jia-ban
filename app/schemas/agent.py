@@ -12,7 +12,8 @@ from pydantic import BaseModel, Field, model_validator
 
 __all__ = [
     "AGENT_INTENTS", "INTENT_TO_ENDPOINT", "INTENT_SUBFIELD", "SCENARIO_ALIASES",
-    "MetricRef", "AgentResponse", "AgentRequest",
+    "MetricRef", "PriorityRef", "EvidenceRef", "TradeoffRef", "UncertaintyRef",
+    "AgentResponse", "AgentRequest",
 ]
 
 # ---------- ① 七意图冻结（A0） ----------
@@ -73,6 +74,36 @@ class MetricRef(BaseModel):
         return self
 
 
+# ---------- V2.3 Advisor Brain 新增（只扩不减，全部 optional / default 空） ----------
+
+class PriorityRef(BaseModel):
+    """主要矛盾：来自 Decision build_issues 的 priorities（确定性，LLM 不判断）。"""
+    issue_id: str
+    severity: str            # P0/P1/P2
+    title: str
+    finding: str             # 为什么（来自 issue.finding，逐字透传）
+
+
+class EvidenceRef(BaseModel):
+    """证据→判断链：claim 是 LLM 的定性判断，metric 是系统注入的带 source 数字。"""
+    claim: str
+    metric: MetricRef
+
+
+class TradeoffRef(BaseModel):
+    """权衡：帮用户看清取舍，不制造最佳方案。"""
+    option: str
+    gain: str                # 得到什么
+    loss: str                # 失去什么
+
+
+class UncertaintyRef(BaseModel):
+    """不确定性表达：信息不足 / 备选解释，绝不假装确定。"""
+    confidence: Literal["high", "medium", "low"] = "medium"
+    missing: list[str] = Field(default_factory=list)        # 信息缺口
+    alternatives: list[str] = Field(default_factory=list)   # 备选解释
+
+
 class AgentResponse(BaseModel):
     """Agent 结构化输出：所有数字来自 API 返回，禁止编造字段。"""
     intent: Literal[AGENT_INTENTS]
@@ -84,6 +115,11 @@ class AgentResponse(BaseModel):
     next_actions: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)   # 原样透传 known_limitations
     source: list[str] = Field(default_factory=list)
+    # ---- V2.3 新增 ----
+    priorities: list[PriorityRef] = Field(default_factory=list)
+    evidence: list[EvidenceRef] = Field(default_factory=list)
+    tradeoffs: list[TradeoffRef] = Field(default_factory=list)
+    uncertainty: UncertaintyRef | None = None
 
 
 class AgentRequest(BaseModel):
