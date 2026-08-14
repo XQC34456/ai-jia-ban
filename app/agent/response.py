@@ -14,7 +14,7 @@ from ..schemas.agent import (
 )
 
 __all__ = ["build_metrics", "known_limitations_of", "build_response",
-           "assemble_advisor_response"]
+           "assemble_advisor_response", "EVIDENCE_METRIC_KEYS"]
 
 # (key, 中文名, unit, source 字段路径, 取值器)
 _OVERVIEW_SPECS = (
@@ -368,6 +368,9 @@ _EVIDENCE_SPECS = {
                                         ("asset_allocation", "classes", "real_estate", "pct"))),
 }
 
+# 稳定 metric_key 白名单（evidence 引用合法 key，也是结构化 schema enum 的同源约束）。
+EVIDENCE_METRIC_KEYS = tuple(_EVIDENCE_SPECS.keys())
+
 
 def _build_evidence(tool_results: list[dict], evidence_raw: list) -> list[EvidenceRef]:
     """把 LLM 的 evidence 引用（claim + metric_key）转成 EvidenceRef（数字系统注入 + source）。
@@ -442,15 +445,25 @@ def _build_priorities(tool_results: list[dict]) -> list[PriorityRef]:
 def build_validity_conditions(overview: dict) -> dict:
     """从 overview 提取判断有效条件快照（固定最小集指标值）。
 
-    只取「判断成立所依赖的关键事实」：cashflow_surplus/dti/liquidity_months/
-    rfr/real_estate_pct。供记忆层失效检测逐 key 对比（Task 4）。取值器与
-    _EVIDENCE_SPECS 同源，保证「判断依据」和「有效条件」用同一套取数口径。
+    只取「判断成立所依赖的关键事实」：财务五指标 + 保障两维度。供记忆层失效检测
+    逐 key 对比。财务指标取值器与 _EVIDENCE_SPECS 同源，保证「判断依据」和
+    「有效条件」用同一套取数口径；保障维度（保险份数/总保额）直接取 overview.
+    protection 块，是确定性派生值（insurance 表 count/sum），非 LLM 编造。
+
+    P1：保险是家庭风险状态的核心事实，任何判断都建立其上，故统一扩展进固定集
+    （而非按 issue 分类依赖）。insurance_count=0 也记录（0 是合法值非 None），
+    否则「无→有保险」的质变无法被失效检测捕捉。
     """
     conds = {}
     for key in ("cashflow_surplus", "dti", "liquidity_months", "rfr", "real_estate_pct"):
         _, _, _, getter = _EVIDENCE_SPECS[key]
         v = getter({"overview": overview})
         if v is not None:
+            conds[key] = v
+    protection = overview.get("protection") or {}
+    for key in ("insurance_count", "total_coverage"):
+        v = protection.get(key)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
             conds[key] = v
     return conds
 

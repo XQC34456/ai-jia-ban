@@ -45,8 +45,8 @@ def test_handle_advisor_multi_step_house(family):
         {"content": None, "tool_calls": [
             _call("get_wealth_overview"), _call("get_wealth_issues"),
         ]},
-        {"content": '{"summary": "现在买房压力偏大", "missing": ["房价"]}', "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"summary": "现在买房压力偏大", "missing": ["房价"]}'])
     resp = handle("我现在适合买房吗", _user(family), llm=fake)
     assert resp.intent == "SCENARIO_COMPARE"
     assert resp.status == "need_clarification"
@@ -58,9 +58,8 @@ def test_handle_advisor_multi_step_house(family):
 def test_handle_advisor_biggest_risk(family):
     fake = FakeLLMProvider(chat_script=[
         {"content": None, "tool_calls": [_call("get_wealth_issues")]},
-        {"content": '{"summary": "你目前最大的风险是负债率偏高", "finding": "房贷月供占收入比例过高"}',
-         "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"summary": "你目前最大的风险是负债率偏高", "finding": "房贷月供占收入比例过高"}'])
     resp = handle("帮我看最大的风险", _user(family), llm=fake)
     assert resp.intent == "CHECK_ISSUES"
     assert resp.status == "ok"
@@ -73,9 +72,8 @@ def test_handle_advisor_biggest_risk(family):
 def test_handle_advisor_retirement_no_internal_ids(family):
     fake = FakeLLMProvider(chat_script=[
         {"content": None, "tool_calls": [_call("get_retirement")]},
-        {"content": '{"summary": "你的养老压力主要来自房产占比偏高、可投资资产偏少"}',
-         "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"summary": "你的养老压力主要来自房产占比偏高、可投资资产偏少"}'])
     resp = handle("为什么我的养老有问题", _user(family), llm=fake)
     assert resp.status == "ok"
     assert "RFR" not in resp.summary and "issue_id" not in resp.summary
@@ -87,8 +85,8 @@ def test_handle_advisor_retirement_no_internal_ids(family):
 def test_handle_advisor_cashflow_pressure(family):
     fake = FakeLLMProvider(chat_script=[
         {"content": None, "tool_calls": [_call("get_cashflow")]},
-        {"content": '{"summary": "你每月还有结余，但应急储备偏薄"}', "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"summary": "你每月还有结余，但应急储备偏薄"}'])
     resp = handle("我最近压力很大，感觉钱不够用", _user(family), llm=fake)
     assert resp.status == "ok"
     assert any(m.key == "cashflow_surplus" and m.source for m in resp.metrics)
@@ -101,9 +99,8 @@ def test_handle_advisor_scenario_income_change(family):
         {"content": None, "tool_calls": [_call("run_scenario",
                                                {"name": "income_change",
                                                 "params": {"pct_change": -0.3}})]},
-        {"content": '{"summary": "收入下降会明显压缩你的应急资金", "recommendations": ["先补应急"]}',
-         "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"summary": "收入下降会明显压缩你的应急资金", "recommendations": ["先补应急"]}'])
     resp = handle("收入下降 30% 会怎样", _user(family, "vip"), llm=fake)
     assert resp.status == "ok"
     assert any(m.source.startswith("comparison.") for m in resp.metrics)
@@ -114,9 +111,8 @@ def test_handle_advisor_scenario_income_change(family):
 
 def test_handle_advisor_chitchat_no_tools(family):
     fake = FakeLLMProvider(chat_script=[
-        {"content": '{"summary": "我主要专注家庭财富，你也可以聊聊理财相关的话题"}',
-         "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"summary": "我主要专注家庭财富，你也可以聊聊理财相关的话题"}'])
     resp = handle("今天天气怎么样", _user(family), llm=fake)
     assert resp.status == "ok"
     assert resp.metrics == []
@@ -127,9 +123,8 @@ def test_handle_advisor_chitchat_no_tools(family):
 
 def test_handle_advisor_pure_calc_refused(family):
     fake = FakeLLMProvider(chat_script=[
-        {"content": '{"refuse": true, "summary": "这是独立的金融计算，我不能自行测算"}',
-         "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"refuse": true, "summary": "这是独立的金融计算，我不能自行测算"}'])
     resp = handle("帮我算 100 万复利 10 年", _user(family), llm=fake)
     assert resp.status == "refused"
 
@@ -139,8 +134,8 @@ def test_handle_advisor_pure_calc_refused(family):
 def test_handle_advisor_education_goal(family):
     fake = FakeLLMProvider(chat_script=[
         {"content": None, "tool_calls": [_call("get_goals")]},
-        {"content": '{"summary": "你的教育金目标还有缺口，需要提前规划"}', "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"summary": "你的教育金目标还有缺口，需要提前规划"}'])
     resp = handle("孩子 5 年后上大学教育金够吗", _user(family), llm=fake)
     assert resp.intent == "CHECK_GOALS"
     assert resp.status == "ok"

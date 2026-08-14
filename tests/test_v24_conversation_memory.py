@@ -34,8 +34,8 @@ def _ask(fid, message, summary="结论"):
     fake = FakeLLMProvider(chat_script=[
         {"content": None, "tool_calls": [{"id": "c1", "name": "get_wealth_issues",
                                           "arguments": {}}]},
-        {"content": '{"summary": "' + summary + '"}', "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"summary": "' + summary + '"}'])
     return converse(message, _user(fid), llm=fake)
 
 

@@ -149,6 +149,9 @@ def migrate() -> None:
         if version < 4:
             _migrate_v4(conn)
             version = 4
+        if version < 5:
+            _migrate_v5(conn)
+            version = 5
         conn.execute(
             "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
             (str(version),),
@@ -293,6 +296,18 @@ def _migrate_v4(conn: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL,
             invalidated_at TEXT,
             FOREIGN KEY(family_id) REFERENCES family(id)
+        )
+    """)
+
+
+def _migrate_v5(conn: sqlite3.Connection) -> None:
+    """内测：新增每日对话配额表（rate limit，防 DeepSeek 费用失控）。"""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS usage_quota (
+            user_id INTEGER PRIMARY KEY,
+            date TEXT NOT NULL,
+            count INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY(user_id) REFERENCES users(id)
         )
     """)
 
@@ -737,6 +752,74 @@ def set_tier(user_id: int, tier: str) -> None:
             "UPDATE users SET tier = ?, vip_expires_at = NULL WHERE id = ?",
             (tier, user_id),
         )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+# ---------- 内测护栏：每日对话配额 + 账号删除 ----------
+
+def consume_daily_quota(user_id: int, limit: int) -> tuple[bool, int]:
+    """内测配额：原子递增用户当日对话计数，返回 (是否超限, 已用次数)。
+
+    日期按服务器本地日翻转；count 每天归零。本次调用后 used > limit 即视为
+    超限（即 limit 次内允许，第 limit+1 次拒绝）。
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT date, count FROM usage_quota WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        if row is None:
+            conn.execute(
+                "INSERT INTO usage_quota (user_id, date, count) VALUES (?, ?, 1)",
+                (user_id, today),
+            )
+            used = 1
+        elif row["date"] != today:
+            conn.execute(
+                "UPDATE usage_quota SET date = ?, count = 1 WHERE user_id = ?",
+                (today, user_id),
+            )
+            used = 1
+        else:
+            used = row["count"] + 1
+            conn.execute(
+                "UPDATE usage_quota SET count = ? WHERE user_id = ?", (used, user_id)
+            )
+        conn.commit()
+        return (used > limit, used)
+    finally:
+        conn.close()
+
+
+# 所有带 family_id 外键的实体表（账号删除时逐表清理；内部白名单，非用户输入）
+_FAMILY_TABLES = [
+    "person", "asset", "liability", "cashflow", "goal", "reminder",
+    "insurance", "family_profile", "scenario_snapshot",
+    "conversation_message", "memory_fact", "advisor_judgment",
+]
+
+
+def delete_user(user_id: int) -> None:
+    """删除用户及其家庭全部数据（个保法删除权）。
+
+    先删配额与所有 family 关联实体（含 V2.4 记忆表），再删用户与 family 行。
+    """
+    user = get_user(user_id)
+    if user is None:
+        return
+    fid = user["family_id"]
+    conn = get_conn()
+    try:
+        conn.execute("DELETE FROM usage_quota WHERE user_id = ?", (user_id,))
+        if fid:
+            for table in _FAMILY_TABLES:
+                conn.execute(f"DELETE FROM {table} WHERE family_id = ?", (fid,))
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        if fid:
+            conn.execute("DELETE FROM family WHERE id = ?", (fid,))
         conn.commit()
     finally:
         conn.close()

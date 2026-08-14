@@ -1,6 +1,6 @@
 // 统一 App Shell：Topbar + Sidebar + Main（hash 路由视图容器）+ 登录门。
 // 铁律：本文件只做「壳」的布局与导航，不做任何财富计算；数据一律来自 store 各切片。
-import { store, loggedIn, login, register, logout, upgrade, ensureOverview } from './store.js';
+import { store, loggedIn, login, register, logout, upgrade, deleteAccount, ensureOverview } from './store.js';
 import { currentRoute, navigate } from './router.js';
 import { VIEWS, NAV_ITEMS } from './views/index.js';
 import { OnboardingView } from './views/onboarding.js';
@@ -48,6 +48,7 @@ const LoginView = {
           <span v-if="mode === 'login'">还没有账号？<a @click="mode='register';err=''">免费注册</a></span>
           <span v-else>已有账号？<a @click="mode='login';err=''">去登录</a></span>
         </div>
+        <div class="beta-notice">🧪 内测版：你的家庭数据会发送给 AI 大模型（第三方）处理以生成建议，请勿输入真实敏感财务信息（真实账户、证件号等）。</div>
       </div>
     </div>`,
 };
@@ -62,7 +63,12 @@ const Topbar = {
         llm.value = !!h.llm;
       } catch { llm.value = false; }
     });
-    return { store, currentLabel, logout, upgrade, llm };
+    async function delAccount() {
+      if (!confirm('确定删除账号及全部家庭数据？此操作不可恢复。')) return;
+      try { await deleteAccount(); }
+      catch (e) { alert(e.message || '删除失败'); }
+    }
+    return { store, currentLabel, logout, upgrade, llm, delAccount };
   },
   template: `
     <header class="topbar">
@@ -74,6 +80,7 @@ const Topbar = {
         <span :class="store.auth.tier === 'vip' ? 'tag-vip' : 'tag-free'">{{ store.auth.tier === 'vip' ? 'VIP' : '免费' }}</span>
         <button v-if="store.auth.tier !== 'vip'" class="btn-ghost" @click="upgrade()">升级 VIP</button>
         <button class="btn-ghost" @click="logout()">退出</button>
+        <button class="btn-ghost btn-danger" @click="delAccount()">删除账号</button>
       </div>
     </header>`,
 };

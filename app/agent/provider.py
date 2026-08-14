@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import json
 from typing import Protocol
 
 __all__ = ["LLMProvider", "NullProvider", "FakeLLMProvider"]
@@ -40,23 +41,36 @@ class NullProvider:
 class FakeLLMProvider:
     """按脚本顺序返回预置结构化输出；脚本耗尽返回 None（测试专用）。
 
-    complete_json 用 script 驱动；chat 用 chat_script 驱动（元素为 chat 返回 dict）。
+    三条独立队列，对应真实场景里互不干扰的调用：
+    - router_script 驱动意图路由（route_intent 的 complete_json，schema 含 intent）。
+    - script 驱动结构化输出（advisor 两阶段 / 情景参数抽取）。
+    - chat_script 驱动 function calling 对话（chat，元素为 chat 返回 dict）。
     chat_messages 记录每次 chat 的 messages，供测试断言工具结果是否回传。
     """
 
-    def __init__(self, script: list[dict] | None = None,
-                 chat_script: list[dict] | None = None):
+    def __init__(self, script: list | None = None,
+                 chat_script: list | None = None,
+                 router_script: list | None = None):
         self._script = list(script or [])
         self._chat_script = list(chat_script or [])
+        self._router_script = list(router_script or [])
         self.last_context: str | None = None
         self.chat_messages: list[list[dict]] = []
 
     def complete_json(self, system: str, user: str, schema: dict,
                       context: str | None = None) -> dict | None:
         self.last_context = context
-        if not self._script:
+        props = schema.get("properties") or {}
+        queue = self._router_script if "intent" in props else self._script
+        if not queue:
             return None
-        return self._script.pop(0)
+        item = queue.pop(0)
+        if isinstance(item, str):          # 允许脚本直接写 JSON 字符串，简化两阶段测试
+            try:
+                return json.loads(item)
+            except json.JSONDecodeError:
+                return None
+        return item
 
     def chat(self, messages: list[dict], tools: list[dict] | None = None) -> dict | None:
         self.chat_messages.append(list(messages))

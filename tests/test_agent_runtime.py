@@ -79,12 +79,12 @@ def test_route_intent_deterministic():
 
 
 def test_route_intent_llm_fallback():
-    llm = FakeLLMProvider([{"intent": "CHECK_ALLOCATION"}])
+    llm = FakeLLMProvider(router_script=[{"intent": "CHECK_ALLOCATION"}])
     assert route_intent("帮我看看理财结构", llm) == "CHECK_ALLOCATION"
 
 
 def test_route_intent_llm_invalid_falls_back():
-    llm = FakeLLMProvider([{"intent": "HACK"}])
+    llm = FakeLLMProvider(router_script=[{"intent": "HACK"}])
     assert route_intent("随便聊聊", llm) == "VIEW_OVERVIEW"    # 非法 → 兜底
 
 
@@ -228,3 +228,37 @@ def test_handle_forbidden_free_user(client, auth_headers):
     resp = handle("我想投资 30 万", _user(auth_headers), llm=llm)
     assert resp.status == "refused"
     assert "upgrade" in resp.next_actions
+
+
+# ---------- P0 修复 B：router 注入记忆上下文（指代消解） ----------
+
+class _SpyRouter(FakeLLMProvider):
+    def __init__(self, intent="CHECK_RETIREMENT"):
+        super().__init__(router_script=[{"intent": intent}])
+        self.seen_user = None
+
+    def complete_json(self, system, user, schema, context=None):
+        self.seen_user = user
+        return super().complete_json(system, user, schema, context)
+
+
+def test_route_intent_injects_memory_for_coreference():
+    """router 支持 memory_context：指代消解所需的历史被注入 LLM prompt。"""
+    spy = _SpyRouter()
+    route_intent("这笔钱怎么安排", spy,
+                 memory_context="【近期对话】\n用户:「给父母留养老钱」")
+    assert "给父母留养老钱" in spy.seen_user
+
+
+def test_handle_passes_memory_context_to_router(client, auth_headers, monkeypatch):
+    """runtime 层：handle 确实把 memory_context 透传给 route_intent（防「router 支持但 runtime 忘传」）。"""
+    captured = {}
+
+    def _spy_route(message, llm=None, wealth_context=None, memory_context=None):
+        captured["memory_context"] = memory_context
+        return "CHECK_RETIREMENT"
+
+    monkeypatch.setattr("app.agent.runtime.route_intent", _spy_route)
+    handle("看看我的养老", _user(auth_headers), llm=NullProvider(),
+           memory_context="【近期对话】用户:「给父母留养老钱」")
+    assert "给父母留养老钱" in (captured["memory_context"] or "")

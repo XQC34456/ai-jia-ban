@@ -79,6 +79,8 @@ button { font-family: inherit; }
   border-radius: 8px; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: background .15s, border-color .15s;
 }
 .btn-ghost:hover { background: var(--bg-soft); color: var(--text); }
+.btn-danger { border-color: #FCA5A5; color: #DC2626; }
+.btn-danger:hover { background: #FEF2F2; color: #B91C1C; }
 
 /* ---------- 应用壳 ---------- */
 .shell { display: flex; flex-direction: column; height: 100vh; }
@@ -160,6 +162,7 @@ button { font-family: inherit; }
 }
 .field input:focus { outline: none; border-color: var(--brand); box-shadow: var(--focus-ring); background: #fff; }
 .login-switch { text-align: center; color: var(--muted); font-size: 13px; }
+.beta-notice { background: var(--warn-soft); color: var(--warn); border: 1px solid #FECACA; border-radius: 10px; padding: 9px 12px; font-size: 12px; line-height: 1.5; }
 
 /* ---------- 冷启动向导 ---------- */
 .onboard-mask {

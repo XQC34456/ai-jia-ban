@@ -128,6 +128,13 @@ def upgrade(user: dict = Depends(get_current_user)):
     return {"tier": "vip"}
 
 
+@app.delete("/api/account")
+def delete_account(user: dict = Depends(get_current_user)):
+    """删除当前账号及其家庭全部数据（个保法删除权，内测三件套之一）。"""
+    db.delete_user(user["id"])
+    return {"ok": True, "deleted": True}
+
+
 # ---------- 家庭档案（数据随登录用户隔离） ----------
 
 @app.get("/api/family")

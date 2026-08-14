@@ -72,3 +72,23 @@ def test_injected_into_system_prompt(family):
     assert "家庭背景内容" in system
     assert "近期对话" in system
     assert system.index("家庭背景内容") < system.index("近期对话")   # wealth 在前，memory 在后
+
+
+# ---------- P1 T3：stale 后 Advisor 重判（失效原因注入） ----------
+
+def test_build_memory_context_invalidation_reason(family):
+    """失效原因（确定性 changed 清单）注入 L3：具体维度 + before→after。"""
+    db.save_judgment(family, priorities=[{"issue_id": "x", "severity": "P0",
+                                          "title": "现金流"}],
+                     evidence=[], recommendation="先解决现金流",
+                     validity_conditions={"insurance_count": 0, "total_coverage": 0})
+    invalidation = [
+        {"key": "insurance_count", "before": 0, "after": 1},
+        {"key": "total_coverage", "before": 0, "after": 300000},
+    ]
+    ctx = build_memory_context(family, invalidation=invalidation)
+    assert "已失效" in ctx
+    assert "保险份数" in ctx
+    assert "0 → 1" in ctx
+    assert "保险总保额" in ctx
+    assert "0 → 300000" in ctx

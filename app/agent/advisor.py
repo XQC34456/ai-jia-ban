@@ -13,7 +13,7 @@ import json
 from ..schemas.agent import AgentResponse
 from .memory import record_judgment
 from .provider import LLMProvider
-from .response import assemble_advisor_response
+from .response import EVIDENCE_METRIC_KEYS, _strip_numeric_text, assemble_advisor_response
 from .tool_schemas import TOOL_SCHEMAS, execute_tool
 from .tools import ToolError
 
@@ -48,16 +48,14 @@ _ADVISOR_SYSTEM = (
     "   - 用户情绪化（「我这辈子攒不下钱」）→ 先共情承接，再诊断，不甩理财知识。\n"
     "   - 用户要绝对答案（「就告诉我买不买」）→ 拒绝简单二选一，给 tradeoffs 并解释为什么不能二选一。\n"
     "   - 用户补充新事实 → 重新理解、重新调工具，不坚持旧结论。\n"
-    "5. 纯金融计算（复利/年化收益率，不涉及具体家庭数据）→ 拒绝："
-    "{\"refuse\": true, \"summary\": \"这是独立的金融计算，我不能自行测算，需要结合你的家庭数据才有意义\"}。\n"
-    "最终回答必须是 JSON（禁止 JSON 之外的文字），结构：\n"
-    "{\"summary\":\"结论(定性)\",\"finding\":\"为什么\","
-    "\"evidence\":[{\"claim\":\"定性判断\",\"metric_key\":\"合法key\"}],"
-    "\"tradeoffs\":[{\"option\":\"方案\",\"gain\":\"得到什么\",\"loss\":\"失去什么\"}],"
-    "\"uncertainty\":{\"confidence\":\"high|medium|low\",\"missing\":[\"缺什么\"],"
-    "\"alternatives\":[\"备选解释\"]},\"recommendations\":[\"建议\"],"
-    "\"next_actions\":[\"下一步\"],\"missing\":[\"信息缺口\"],\"refuse\":false}。\n"
-    "missing 仅在信息不足时出现；refuse 仅在拒绝独立计算时为 true。"
+    "5. 纯金融计算（复利/年化收益率，不涉及具体家庭数据）→ 拒绝，说明这是独立的金融计算，"
+    "需要结合家庭数据才有意义。\n"
+    "6. 旧判断失效重判：当【记忆】里出现「上次判断已失效」时，先指出发生了什么变化"
+    "（基于系统给出的失效原因，数字由系统提供、你只复述不计算），说明为什么旧判断"
+    "不能直接沿用，再基于当前数据重新评估。绝不机械复述旧结论，也绝不自行判断"
+    "「是否失效」——失效与否由系统确定性标记，你只负责解释变化并重新判断。\n"
+    "最终用自然语言完整回答（结论 + 为什么 + 证据链 + 权衡 + 建议 + 下一步），"
+    "不要输出 JSON——结构化输出由系统单独完成，你只管把话说清楚、说人话。"
 )
 
 
@@ -124,13 +122,82 @@ def run_advisor(user: dict, message: str, llm: LLMProvider,
 _CLARIFY_PREFIX = "需要补充以下信息："
 
 
-def _parse_json(content: str | None) -> dict | None:
-    if not content:
-        return None
-    try:
-        data = json.loads(content)
-    except (json.JSONDecodeError, TypeError):
-        return None
+_ADVISOR_STRUCTURE_SYSTEM = (
+    "你是家庭财富顾问回答的结构化压缩器。\n"
+    "输入：用户问题 + 顾问的一段自然语言回答。\n"
+    "任务：把这段回答转成规定的 JSON 结构，不改变原意、不新增原文没有的判断。\n"
+    "铁律：\n"
+    "1. 绝不计算、绝不编造任何数字。summary/finding/recommendations/next_actions/"
+    "tradeoffs/missing 全部写定性文字，禁止出现任何数字。\n"
+    "2. 需要引用具体数值时，只在 evidence 里用 metric_key 引用"
+    "（合法 key 见 schema enum），数值由系统注入，不要写进文字里。\n"
+    "3. missing 只在原文明确「信息不足、无法给出结论、需要用户补充信息才能判断」时输出，"
+    "内容是「缺什么信息」。原文若已给出明确诊断，末尾建议「核实/补充数据」属于 next_actions，"
+    "不是 missing，不要混。\n"
+    "4. refuse 仅在原文明确「拒绝独立金融计算」（复利/年化/单利这类与家庭数据无关的纯计算）"
+    "时才置 true；诊断出负面结果、风险、缺口、亏损都只是正常结论，绝不设 refuse。\n"
+    "5. 不确定时用 uncertainty 表达，confidence 只能 high/medium/low。"
+)
+
+
+_ADVISOR_STRUCTURE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary": {"type": "string"},
+        "finding": {"type": ["string", "null"]},
+        "evidence": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "claim": {"type": "string"},
+                    "metric_key": {"type": "string", "enum": list(EVIDENCE_METRIC_KEYS)},
+                },
+                "required": ["claim", "metric_key"],
+            },
+        },
+        "tradeoffs": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "option": {"type": "string"},
+                    "gain": {"type": "string"},
+                    "loss": {"type": "string"},
+                },
+                "required": ["option", "gain", "loss"],
+            },
+        },
+        "uncertainty": {
+            "type": ["object", "null"],
+            "properties": {
+                "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+                "missing": {"type": "array", "items": {"type": "string"}},
+                "alternatives": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+        "recommendations": {"type": "array", "items": {"type": "string"}},
+        "next_actions": {"type": "array", "items": {"type": "string"}},
+        "missing": {"type": "array", "items": {"type": "string"}},
+        "refuse": {"type": "boolean"},
+    },
+    "required": ["summary"],
+}
+
+
+def _structure_advisor_answer(llm: LLMProvider, prose: str | None,
+                              message: str) -> dict | None:
+    """两阶段结构输出：把工具循环产出的散文压成规定 JSON（强制 json_object）。
+
+    结构由 complete_json（response_format=json_object）保证合法 JSON；数字不在此
+    产生，只写定性 + metric_key 引用，下游 assemble 确定性注入数值。
+    """
+    user_prompt = (
+        f"【用户问题】\n{message}\n\n"
+        f"【顾问的自然语言回答】\n{prose or '（无）'}"
+    )
+    data = llm.complete_json(_ADVISOR_STRUCTURE_SYSTEM, user_prompt,
+                             _ADVISOR_STRUCTURE_SCHEMA)
     return data if isinstance(data, dict) else None
 
 
@@ -146,20 +213,36 @@ def advise(user: dict, message: str, llm: LLMProvider,
                       memory_context=memory_context)
     if raw is None:
         return None
-    llm_json = _parse_json(raw.get("content"))
-    if llm_json is None:
-        return None
     tool_results = raw.get("tool_results") or []
+    llm_json = _structure_advisor_answer(llm, raw.get("content"), message)
+    if llm_json is None:
+        # structure 阶段失败但 tool_loop 已产出散文 → 用散文兜底（回答可用性），不整体降级。
+        # prose 只是「回答可用性兜底」，非确定性事实来源：metrics/priorities/evidence 仍从
+        # tool_results 确定性取，数字仍由 _strip_numeric_text 处理，source/status 绝不从 prose 猜。
+        # 只有 chat 彻底无产出（content 空）才降级 None → 上层确定性兜底。
+        prose = raw.get("content")
+        if not prose:
+            return None
+        llm_json = {"summary": prose}
 
     if llm_json.get("refuse"):
         return assemble_advisor_response(tool_results, llm_json, intent, status="refused")
 
     missing = llm_json.get("missing")
     if missing and isinstance(missing, list) and missing:
-        clarify = _CLARIFY_PREFIX + "、".join(str(m) for m in missing)
-        resp = assemble_advisor_response(tool_results, llm_json, intent,
-                                         status="need_clarification")
-        return resp.model_copy(update={"summary": clarify})
+        # 只有顾问「没产出任何有效证据」时才判信息不足 → need_clarification。
+        # 已基于数据诊断（evidence 非空）时的 missing 是「诊断后追问细节」，保持 ok，
+        # 追问内容经 uncertainty.missing 呈现，绝不丢弃已做好的诊断结论。
+        resp = assemble_advisor_response(tool_results, llm_json, intent, status="ok")
+        if not resp.evidence:
+            # 数字防编造闸：missing 是 LLM 定性文字，含数字的项 strip 掉（数字只来自
+            # metrics），否则拼接进 summary 会违反「数字无编造」铁律。
+            clean_missing = [m for m in missing
+                             if isinstance(m, str) and _strip_numeric_text(m) is not None]
+            clarify = _CLARIFY_PREFIX + "、".join(clean_missing)
+            return resp.model_copy(update={"summary": clarify, "status": "need_clarification"})
+        record_judgment(user, resp)
+        return resp
 
     resp = assemble_advisor_response(tool_results, llm_json, intent, status="ok")
     record_judgment(user, resp)

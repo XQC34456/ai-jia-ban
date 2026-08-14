@@ -38,8 +38,8 @@ def _c(name, args=None):
 def _advise(fid, message, summary="现金流是主要矛盾"):
     fake = FakeLLMProvider(chat_script=[
         {"content": None, "tool_calls": [_c("get_wealth_issues")]},
-        {"content": '{"summary":"' + summary + '"}', "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"summary":"' + summary + '"}'])
     return advise(_user(fid), message, fake, intent="CHECK_ISSUES")
 
 
@@ -71,8 +71,8 @@ def test_new_judgment_invalidates_previous(family):
 
 def test_refused_not_recorded(family):
     fake = FakeLLMProvider(chat_script=[
-        {"content": '{"refuse": true, "summary": "独立计算我拒绝"}', "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"refuse": true, "summary": "独立计算我拒绝"}'])
     resp = advise(_user(family), "帮我算100万复利", fake, intent="VIEW_OVERVIEW")
     assert resp.status == "refused"
     assert db.latest_judgment(family) is None

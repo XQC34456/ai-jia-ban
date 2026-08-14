@@ -35,8 +35,8 @@ def _advise(fid, message):
     fake = FakeLLMProvider(chat_script=[
         {"content": None, "tool_calls": [{"id": "c1", "name": "get_wealth_issues",
                                           "arguments": {}}]},
-        {"content": '{"summary":"现金流是主要矛盾"}', "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"summary":"现金流是主要矛盾"}'])
     return advise(_user(fid), message, fake, intent="CHECK_ISSUES")
 
 
@@ -68,3 +68,55 @@ def test_no_change_keeps_active(family):
 
 def test_no_active_judgment_returns_empty(family):
     assert detect_invalidation(family) == []       # 无判断 → 无失效可检测
+
+
+# ---------- P1 保障维度：保险变化 → stale（固定集统一扩展，非分类依赖） ----------
+
+def _add_insurance(fid, coverage=300000, annual_premium=5000):
+    """新增一份保险（apply_action 不支持 insurance，直接写主表）。"""
+    db._insert("insurance", {
+        "family_id": fid, "type": "医疗险", "name": "百万医疗",
+        "coverage": coverage, "annual_premium": annual_premium,
+    })
+
+
+def _set_coverage(fid, coverage):
+    """改已有保险的保额（份数不变，只动 coverage）。"""
+    rows = db._rows("SELECT id FROM insurance WHERE family_id=?", (fid,))
+    assert rows
+    conn = db.get_conn()
+    try:
+        conn.execute("UPDATE insurance SET coverage = ? WHERE id = ?",
+                     (coverage, rows[0]["id"]))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def test_insurance_added_invalidates(family):
+    """无保险 → 加保险：保障状态质变，判断必须 stale（insurance_count 0→1）。"""
+    _advise(family, "帮我看看最大风险")            # 判断时无保险
+    conds = db.latest_judgment(family)["validity_conditions"]
+    assert conds["insurance_count"] == 0
+    assert conds["total_coverage"] == 0
+    _add_insurance(family)                          # 加保险
+    changed = detect_invalidation(family)
+    assert changed
+    assert any(c["key"] == "insurance_count" and c["before"] == 0 and c["after"] == 1
+               for c in changed)
+    assert any(c["key"] == "total_coverage" and c["after"] == 300000 for c in changed)
+    assert db.latest_judgment(family)["status"] == "stale"
+
+
+def test_insurance_coverage_change_invalidates(family):
+    """保额变化（份数不变）→ total_coverage 变 → stale；count 不该作为变化项。"""
+    _add_insurance(family, coverage=100000)         # 先有一份 10 万保额
+    _advise(family, "帮我看看最大风险")            # 判断时 total_coverage=100000
+    assert db.latest_judgment(family)["validity_conditions"]["total_coverage"] == 100000
+    _set_coverage(family, 500000)                   # 保额 10 万 → 50 万
+    changed = detect_invalidation(family)
+    assert changed
+    assert any(c["key"] == "total_coverage" and c["before"] == 100000 and c["after"] == 500000
+               for c in changed)
+    assert not any(c["key"] == "insurance_count" for c in changed)
+    assert db.latest_judgment(family)["status"] == "stale"

@@ -106,13 +106,28 @@ def detect_invalidation(family_id: int) -> list[dict]:
     return changed
 
 
+# 失效维度 → 人话标签（detect_invalidation 的 changed 清单 key 翻译，供 advisor 读懂）。
+_INVALIDATION_LABELS = {
+    "cashflow_surplus": "月度结余",
+    "dti": "负债率",
+    "liquidity_months": "应急资金月数",
+    "rfr": "养老覆盖",
+    "real_estate_pct": "房产占比",
+    "insurance_count": "保险份数",
+    "total_coverage": "保险总保额",
+}
+
+
 def build_memory_context(family_id: int,
-                         conversation_turns: int = CONVERSATION_WINDOW) -> str:
+                         conversation_turns: int = CONVERSATION_WINDOW,
+                         invalidation: list[dict] | None = None) -> str:
     """合成三层记忆摘要（L1 近期对话 + L2 家庭事实 + L3 最近判断），注入 advisor。
 
     纯函数、零 LLM、零财富计算——只「搬运」已落库的记忆，绝不编数字、绝不参与计算。
     限量：L1 固定最近 N 轮、L2 只当前有效、L3 只最近 1 次判断。空记忆 → 空串。
-    失效判断（status=stale）附「已失效」提示（由 detect_invalidation 确定性标记）。
+    失效判断（status=stale）附「已失效」提示（由 detect_invalidation 确定性标记）；
+    invalidation（本次失效的 changed 清单）非空时，附具体维度 + before→after（数字
+    来自确定性 diff，非 LLM 计算），供 advisor 先比较变化再重新评估。
     """
     parts: list[str] = []
 
@@ -132,7 +147,12 @@ def build_memory_context(family_id: int,
             p.get("title") or p.get("issue_id", "") for p in j["priorities"])]
         if j["recommendation"]:
             lines.append(f"· 上次建议：{j['recommendation']}")
-        if j["status"] == "stale":
+        if invalidation:
+            dims = [f"{_INVALIDATION_LABELS.get(c.get('key'), c.get('key'))}："
+                    f"{c.get('before')} → {c.get('after')}" for c in invalidation]
+            lines.append("⚠️ 上次判断已失效，以下关键数据已变化，请先比较变化再重新评估：")
+            lines.extend(f"  - {d}" for d in dims)
+        elif j["status"] == "stale":
             lines.append("⚠️ 上次判断已失效：判断依赖的关键数据已变化，请重新评估")
         parts.append("【上次判断】\n" + "\n".join(lines))
 

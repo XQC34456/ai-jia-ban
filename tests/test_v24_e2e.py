@@ -41,8 +41,9 @@ def _converse(fid, message, provider, tool, summary):
     """用共享 provider 驱动一轮对话（每轮重置脚本，chat_messages 累积供注入断言）。"""
     provider._chat_script = [
         {"content": None, "tool_calls": [_c(tool)]},
-        {"content": '{"summary":"' + summary + '"}', "tool_calls": []},
+        {"content": None, "tool_calls": []},
     ]
+    provider._script = ['{"summary":"' + summary + '"}']
     return converse(message, _user(fid), llm=provider)
 
 

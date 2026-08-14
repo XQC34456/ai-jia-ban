@@ -70,6 +70,12 @@ export function logout() {
   localStorage.removeItem('onboarded');
 }
 
+export async function deleteAccount() {
+  // 删除账号及全部家庭数据（个保法删除权，内测三件套之一），成功后退出登录。
+  await api('/api/account', { method: 'DELETE', token: store.auth.token });
+  logout();
+}
+
 export async function loadOverview() {
   store.loading = true;
   store.error = null;

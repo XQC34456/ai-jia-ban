@@ -59,7 +59,8 @@ def handle(message: str, user: dict, llm: LLMProvider | None = None,
         intent = "SCENARIO_COMPARE"
         hint = refusal["scenario"]
     else:
-        intent = route_intent(message, llm, wealth_context=wealth_context)
+        intent = route_intent(message, llm, wealth_context=wealth_context,
+                              memory_context=memory_context)
         hint = None
 
     # ② advisor_path：所有意图（含 EXPLAIN_RESULT）先走顾问式 tool_loop（LLM 为插件）。

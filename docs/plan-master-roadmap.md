@@ -57,8 +57,9 @@
 | C6 | AI 顾问统一收口（建档吸收 + 七意图 + 确定性产出） | ✅ 冻结 `f227c95` |
 | 4.1 展示层 | 体检横幅 / 为什么 / 下一步按钮 / 沙盘模式提示 / 冷启动向导 | ✅ 5 commit |
 
-- 测试：**pytest 261 passed · node 12 passed**
+- 测试：**pytest 428 passed · node 12 passed**
 - **冻结契约**：A1–A4、Wealth Engine、Decision、API Schema、Agent Runtime —— 后续阶段一律不修改。
+- **内测基线 + 暂缓清单**：见 [internal-beta-baseline.md](internal-beta-baseline.md)（内测阶段口径）。
 
 > **底层已足够支撑真正的 AI Advisor。下一阶段不再堆页面，只做「大脑」（Plan D）。**
 
@@ -85,12 +86,12 @@
 
 | 阶段 | 目标 | 服务用户 | 前置 | 状态 |
 |------|------|----------|------|------|
-| **V2.1** Context Engine | 组装五块 Wealth Context 注入 provider | 回答「针对你家」 | 审计（D0） | ⏳ |
-| **V2.2** Tool Calling | 10 个只读 tool + function-calling | 会调用而非背诵 | V2.1 | ⏳ |
-| **V2.3** Advisor Brain | 状态机 + 六步 SOP + 修复 EXPLAIN_RESULT 死分支 | 顾问感 + 有效对话 | V2.1+V2.2 | ⏳ |
-| **V2.4** Conversation Memory | 对话历史 + 决策历史 + L4 偏好 | 追问不失忆 | V2.3 | ⏳ |
-| **V2.5** Proactive Advisor | 登录即主动提醒（需调度器） | 主动陪伴 | V2.4 | ⏳ |
-| **V2.6** Action Loop | `create_action` 形成计划/提醒/复盘 | 推动行动 | V2.4 | ⏳ |
+| **V2.1** Context Engine | 组装五块 Wealth Context 注入 provider | 回答「针对你家」 | 审计（D0） | ✅ |
+| **V2.2** Tool Calling | 10 个只读 tool + function-calling | 会调用而非背诵 | V2.1 | ✅ |
+| **V2.3** Advisor Brain | 状态机 + 六步 SOP + 修复 EXPLAIN_RESULT 死分支 | 顾问感 + 有效对话 | V2.1+V2.2 | ✅ |
+| **V2.4** Conversation Memory | 对话历史 + 决策历史 + L4 偏好 | 追问不失忆 | V2.3 | ✅ |
+| **V2.5** Proactive Advisor | 登录即主动提醒（需调度器） | 主动陪伴 | V2.4 | 📦 暂缓 |
+| **V2.6** Action Loop | `create_action` 形成计划/提醒/复盘 | 推动行动 | V2.4 | 📦 暂缓 |
 
 > **H（Evaluation）不是阶段，是贯穿 V2.1→V2.6 的护栏**：30~50 条黄金场景，保证改提示词不破坏财富正确性。
 
@@ -105,7 +106,7 @@
 | **4.1 人性化（展示层）** | ✅ 已完成 5 commit | 服务 **V2.3**（Advisor Brain 的前端骨架） |
 | **4.1 收尾**（下一步按钮化 / 沙盘决策历史） | ⏸ 暂停 | 等 **V2.3/V2.4** 定下 `next_actions` 语义后再做，避免返工 |
 | **冷启动** | ✅ 已完成 | 服务 **V2.1**（新用户 60 秒内进入首次对话，喂饱上下文） |
-| **数据治理**（health_check→build_issues 统一口径 / 死字段清理） | ⏳ 待做 | 服务 **V2.1**（让 LLM 看到干净、一致的数据） |
+| **数据治理**（health_check→build_issues 统一口径 / 死字段清理） | 📦 暂缓 | 服务 **V2.1**（让 LLM 看到干净、一致的数据） |
 | **沙盘** | ✅ 冻结 | 是顾问的**能力底座**，V2.2/V2.6 调用它完成「模拟」 |
 
 ---
@@ -120,8 +121,9 @@
 
 ## 7. 数据安全基线（测试版之前，必做）
 
-- 加密存储 + 最小权限 + 数据导出 / 删除权（个保法）。
-- 密钥安全：`LLM_API_KEY` 不落前端、不入库、不随响应回传。
+- 加密存储 + 最小权限 + 数据导出 / 隐私政策 / 数据出境告知（个保法）→ 📦 暂缓（公网开放前必做）。
+- 删除权 → 内测三件套补丁中落地，见 [internal-beta-baseline.md](internal-beta-baseline.md) §4。
+- 密钥安全：`LLM_API_KEY` 不落前端、不入库、不随响应回传 → ✅ 已完成。
 
 ---
 

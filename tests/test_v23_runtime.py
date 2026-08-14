@@ -32,8 +32,8 @@ def _user(fid):
 def test_explain_result_goes_advisor_path(family):
     fake = FakeLLMProvider(chat_script=[
         {"content": None, "tool_calls": [{"id": "c1", "name": "get_wealth_issues", "arguments": {}}]},
-        {"content": '{"summary": "我解释一下你当前的主要风险"}', "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"summary": "我解释一下你当前的主要风险"}'])
     resp = handle("解释一下", _user(family), llm=fake)
     assert resp.status == "ok"          # 不再是 need_clarification 死分支
 
@@ -41,8 +41,8 @@ def test_explain_result_goes_advisor_path(family):
 def test_counter_challenge_goes_advisor_path(family):
     fake = FakeLLMProvider(chat_script=[
         {"content": None, "tool_calls": [{"id": "c1", "name": "get_wealth_issues", "arguments": {}}]},
-        {"content": '{"summary": "我重新核对了数据，之前的判断需要修正"}', "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"summary": "我重新核对了数据，之前的判断需要修正"}'])
     resp = handle("你说的不对", _user(family), llm=fake)
     assert resp.status == "ok"
 
@@ -50,8 +50,8 @@ def test_counter_challenge_goes_advisor_path(family):
 def test_emotion_goes_advisor_path(family):
     fake = FakeLLMProvider(chat_script=[
         {"content": None, "tool_calls": [{"id": "c1", "name": "get_cashflow", "arguments": {}}]},
-        {"content": '{"summary": "先别急，我帮你看一下现金流"}', "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"summary": "先别急，我帮你看一下现金流"}'])
     resp = handle("我这辈子都攒不下钱", _user(family), llm=fake)
     assert resp.status == "ok"
 
@@ -59,10 +59,9 @@ def test_emotion_goes_advisor_path(family):
 def test_absolute_answer_goes_advisor_path(family):
     fake = FakeLLMProvider(chat_script=[
         {"content": None, "tool_calls": [{"id": "c1", "name": "get_wealth_overview", "arguments": {}}]},
-        {"content": '{"summary": "这不是简单的二选一",'
-                    '"tradeoffs":[{"option":"现在买","gain":"住房确定性","loss":"流动性"}]}',
-         "tool_calls": []},
-    ])
+        {"content": None, "tool_calls": []},
+    ], script=['{"summary": "这不是简单的二选一",'
+               '"tradeoffs":[{"option":"现在买","gain":"住房确定性","loss":"流动性"}]}'])
     resp = handle("你就告诉我买不买", _user(family), llm=fake)
     assert resp.status == "ok"
     assert resp.tradeoffs

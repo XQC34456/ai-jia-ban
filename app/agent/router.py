@@ -53,19 +53,24 @@ def refusal_gate(message: str) -> dict | None:
 
 
 def route_intent(message: str, llm: LLMProvider | None = None,
-                 wealth_context: str | None = None) -> str:
+                 wealth_context: str | None = None,
+                 memory_context: str | None = None) -> str:
     """确定性关键词 → LLM 兜底 → Literal 七意图校验 → 兜底 VIEW_OVERVIEW。
 
     wealth_context 仅在 LLM 兜底注入（关键词命中的确定性路径不注入；意图分类输出
-    是枚举、非数字，注入背景可消歧、无编造风险）。
+    是枚举、非数字，注入背景可消歧、无编造风险）。memory_context（近期对话）同样
+    仅在 LLM 兜底注入，用于消解「这笔钱/这个/那」这类指代。
     """
     for intent, words in _INTENT_KEYWORDS:
         if any(w in message for w in words):
             return intent
     if llm is not None:
+        user_prompt = message
+        if memory_context:
+            user_prompt = f"{message}\n\n【对话历史（用于消解指代）】\n{memory_context}"
         raw = llm.complete_json(
             system=_ROUTER_SYSTEM,
-            user=message,
+            user=user_prompt,
             schema={"type": "object",
                     "properties": {"intent": {"type": "string", "enum": list(AGENT_INTENTS)}},
                     "required": ["intent"]},

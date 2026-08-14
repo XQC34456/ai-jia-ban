@@ -26,8 +26,8 @@ def converse(message: str, user: dict, llm: LLMProvider | None = None,
     if actions:
         return create_confirm(user["family_id"], actions)
     wealth_context = _wealth_context_text(user)
-    detect_invalidation(user["family_id"])          # 先确定性失效检测（标记 stale）
-    memory_context = build_memory_context(user["family_id"])
+    invalidation = detect_invalidation(user["family_id"])   # 先确定性失效检测（标记 stale）
+    memory_context = build_memory_context(user["family_id"], invalidation=invalidation)
     result = handle(message, user, llm=llm, context=context, wealth_context=wealth_context,
                     memory_context=memory_context)
     record_turn(user["family_id"], message, result)
