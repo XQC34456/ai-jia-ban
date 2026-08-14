@@ -8,6 +8,7 @@ from __future__ import annotations
 from .. import db
 from ..schemas.agent import AgentResponse, ConfirmCard
 from .context import build_wealth_context, context_to_text
+from .memory import record_turn
 from .profile import create_confirm, extract_actions
 from .provider import LLMProvider
 from .runtime import handle
@@ -25,7 +26,9 @@ def converse(message: str, user: dict, llm: LLMProvider | None = None,
     if actions:
         return create_confirm(user["family_id"], actions)
     wealth_context = _wealth_context_text(user)
-    return handle(message, user, llm=llm, context=context, wealth_context=wealth_context)
+    result = handle(message, user, llm=llm, context=context, wealth_context=wealth_context)
+    record_turn(user["family_id"], message, result)
+    return result
 
 
 def _wealth_context_text(user: dict) -> str | None:
