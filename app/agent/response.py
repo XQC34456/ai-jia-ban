@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import re
 
-from ..schemas.agent import AgentResponse, EvidenceRef, MetricRef, PriorityRef
+from ..schemas.agent import (
+    AgentResponse, EvidenceRef, MetricRef, PriorityRef, TradeoffRef, UncertaintyRef,
+)
 
 __all__ = ["build_metrics", "known_limitations_of", "build_response",
            "assemble_advisor_response"]
@@ -437,12 +439,46 @@ def _build_priorities(tool_results: list[dict]) -> list[PriorityRef]:
     return []
 
 
+def _build_tradeoffs(tradeoffs_raw: list) -> list[TradeoffRef]:
+    """把 LLM 的 tradeoffs（option/gain/loss）转成 TradeoffRef。
+
+    定性描述：三字段任一含数字 → 丢弃（trade-off 是取舍描述，不是财富计算数字）。
+    """
+    if not isinstance(tradeoffs_raw, list):
+        return []
+    out: list[TradeoffRef] = []
+    for t in tradeoffs_raw:
+        if not isinstance(t, dict):
+            continue
+        option, gain, loss = t.get("option"), t.get("gain"), t.get("loss")
+        if not all(isinstance(x, str) and x for x in (option, gain, loss)):
+            continue
+        if any(_DIGIT_RE.search(x) for x in (option, gain, loss)):
+            continue
+        out.append(TradeoffRef(option=option, gain=gain, loss=loss))
+    return out
+
+
+def _build_uncertainty(uncertainty_raw) -> UncertaintyRef | None:
+    """把 LLM 的 uncertainty 转成 UncertaintyRef；confidence 非法时归一化为 medium。"""
+    if not isinstance(uncertainty_raw, dict):
+        return None
+    confidence = uncertainty_raw.get("confidence")
+    if confidence not in ("high", "medium", "low"):
+        confidence = "medium"
+    missing = [str(m) for m in (uncertainty_raw.get("missing") or []) if isinstance(m, str)]
+    alternatives = [str(a) for a in (uncertainty_raw.get("alternatives") or [])
+                    if isinstance(a, str)]
+    return UncertaintyRef(confidence=confidence, missing=missing, alternatives=alternatives)
+
+
 def assemble_advisor_response(tool_results: list[dict], llm_json: dict | None,
                               intent: str, status: str = "ok") -> AgentResponse:
-    """组装顾问式 AgentResponse：metrics 来自 tool_results（带 source），LLM 只定性。
+    """组装顾问式 AgentResponse：metrics/evidence/priorities 来自 tool_results（带 source），
+    LLM 只定性。
 
     数字防编造：LLM 的 summary/finding/recommendations/next_actions 含数字一律丢弃，
-    数字由 metrics（带 source）承载。
+    数字由 metrics（带 source）承载；evidence 的 claim 定性 + metric_key 引用，数字系统注入。
     """
     llm_json = llm_json or {}
     metrics = _metrics_from_tool_results(tool_results)
@@ -450,6 +486,10 @@ def assemble_advisor_response(tool_results: list[dict], llm_json: dict | None,
     finding = _strip_numeric_text(llm_json.get("finding"))
     recommendations = _strip_numeric_list(llm_json.get("recommendations"))
     next_actions = _strip_numeric_list(llm_json.get("next_actions"))
+    evidence = _build_evidence(tool_results, llm_json.get("evidence"))
+    priorities = _build_priorities(tool_results)
+    tradeoffs = _build_tradeoffs(llm_json.get("tradeoffs"))
+    uncertainty = _build_uncertainty(llm_json.get("uncertainty"))
     return AgentResponse(
         intent=intent,
         status=status,
@@ -460,4 +500,8 @@ def assemble_advisor_response(tool_results: list[dict], llm_json: dict | None,
         next_actions=next_actions,
         limitations=[],
         source=[m.source for m in metrics if m.source],
+        priorities=priorities,
+        evidence=evidence,
+        tradeoffs=tradeoffs,
+        uncertainty=uncertainty,
     )
