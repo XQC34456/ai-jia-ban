@@ -58,8 +58,8 @@ def test_refusal_gate_translates_to_invest():
     assert refusal_gate("帮我算 10 年后资产有多少") == {"scenario": "invest"}
 
 
-def test_refusal_gate_refuses_pure_calc():
-    assert refusal_gate("帮我算 100 万复利 20 年是多少") == {"refuse": True}
+def test_refusal_gate_disambiguates_pure_calc():
+    assert refusal_gate("帮我算 100 万复利 20 年是多少") == {"disambiguate": True}
 
 
 def test_refusal_gate_not_compute():
@@ -217,9 +217,10 @@ def test_handle_scenario_missing_params(client, auth_headers):
     assert "投资金额" in resp.summary
 
 
-def test_handle_refuse_pure_calc(client, auth_headers):
+def test_handle_disambiguate_pure_calc(client, auth_headers):
     resp = handle("帮我算 100 万复利 20 年", _user(auth_headers), llm=NullProvider())
-    assert resp.status == "refused"
+    assert resp.status == "need_clarification"
+    assert "复利" in resp.summary
 
 
 def test_handle_forbidden_free_user(client, auth_headers):

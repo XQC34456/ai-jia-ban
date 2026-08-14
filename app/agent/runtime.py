@@ -32,6 +32,11 @@ _OK_SUMMARY = {
 
 _CLARIFY_PREFIX = "需要补充以下信息："
 
+_DISAMBIGUATE_SUMMARY = (
+    "你是想知道复利本身怎么计算，还是想看看它对你家庭未来资产有什么影响？"
+    "前者是独立金融计算，我不能自行测算；后者我可以结合你的家庭数据做情景模拟。"
+)
+
 
 def handle(message: str, user: dict, llm: LLMProvider | None = None,
            context: dict | None = None, wealth_context: str | None = None) -> AgentResponse:
@@ -39,9 +44,9 @@ def handle(message: str, user: dict, llm: LLMProvider | None = None,
     # ① 拒算门（优先于普通意图路由）
     refusal = refusal_gate(message)
     if refusal is not None:
-        if refusal.get("refuse"):
-            return build_response("EXPLAIN_RESULT", "refused", None,
-                                  summary="这属于独立金融计算，需要调用财富引擎，我不能自行测算。")
+        if refusal.get("disambiguate"):
+            return build_response("EXPLAIN_RESULT", "need_clarification", None,
+                                  summary=_DISAMBIGUATE_SUMMARY)
         intent = "SCENARIO_COMPARE"
         hint = refusal["scenario"]
     else:

@@ -42,12 +42,13 @@ def refusal_gate(message: str) -> dict | None:
     返回：
     - None                 → 非测算请求，走普通路由
     - {"scenario": "invest"} → 可表达为投资情景，转 SCENARIO_COMPARE（缺参数再追问）
-    - {"refuse": True}     → 纯金融计算，无家庭上下文，拒绝自行计算
+    - {"disambiguate": True} → 纯金融计算词（复利/年化/单利/本金），交 LLM 消歧
+      （知识问答 / 纯计算拒绝 / 家庭影响走 scenario），不直接 refuse
     """
     if not any(w in message for w in _COMPUTE_WORDS):
         return None
     if any(w in message for w in _PURE_CALC_WORDS):
-        return {"refuse": True}
+        return {"disambiguate": True}
     return {"scenario": "invest"}
 
 

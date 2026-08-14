@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import json
 
+from ..schemas.agent import AgentResponse
 from .provider import LLMProvider
+from .response import assemble_advisor_response
 from .tool_schemas import TOOL_SCHEMAS, execute_tool
 from .tools import ToolError
 
-__all__ = ["run_advisor"]
+__all__ = ["run_advisor", "advise"]
 
 MAX_ROUNDS = 6
 
@@ -27,9 +29,13 @@ _ADVISOR_SYSTEM = (
     "3. 最终回答必须是 JSON，禁止输出 JSON 之外的文字；禁止在文字里出现任何财富数字"
     "（金额/百分比/评分/比率等具体数值由系统从工具结果注入，你只写定性判断）。\n"
     "4. 工具返回结果后，读真实数据做第二轮推理，把结论写成人话，不甩内部标识。\n"
+    "5. 如果用户要求「独立的金融计算」（复利/年化/收益率等，不涉及具体家庭数据），"
+    "不要自己算，输出 {\"refuse\": true, \"summary\": \"这是独立的金融计算，我不能自行测算，"
+    "需要结合你的家庭数据才有意义\"}。\n"
     "JSON 结构：{\"summary\":\"结论\",\"finding\":\"为什么\","
-    "\"recommendations\":[\"建议\"],\"next_actions\":[\"下一步\"],\"missing\":[\"缺的字段\"]}。\n"
-    "missing 仅在信息不足时出现。"
+    "\"recommendations\":[\"建议\"],\"next_actions\":[\"下一步\"],\"missing\":[\"缺的字段\"],"
+    "\"refuse\":false}。\n"
+    "missing 仅在信息不足时出现；refuse 仅在拒绝独立计算时为 true。"
 )
 
 
@@ -87,3 +93,44 @@ def run_advisor(user: dict, message: str, llm: LLMProvider,
                              "name": tc["name"], "content": content})
 
     return None
+
+
+_CLARIFY_PREFIX = "需要补充以下信息："
+
+
+def _parse_json(content: str | None) -> dict | None:
+    if not content:
+        return None
+    try:
+        data = json.loads(content)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def advise(user: dict, message: str, llm: LLMProvider,
+           wealth_context: str | None = None,
+           intent: str = "VIEW_OVERVIEW") -> AgentResponse | None:
+    """编排 advisor 完整流程：run_advisor → 解析 → refuse/missing → 组装。
+
+    返回 AgentResponse，或 None（LLM 失败 / content 无法解析 → 上层确定性兜底）。
+    """
+    raw = run_advisor(user, message, llm, wealth_context=wealth_context)
+    if raw is None:
+        return None
+    llm_json = _parse_json(raw.get("content"))
+    if llm_json is None:
+        return None
+    tool_results = raw.get("tool_results") or []
+
+    if llm_json.get("refuse"):
+        return assemble_advisor_response(tool_results, llm_json, intent, status="refused")
+
+    missing = llm_json.get("missing")
+    if missing and isinstance(missing, list) and missing:
+        clarify = _CLARIFY_PREFIX + "、".join(str(m) for m in missing)
+        resp = assemble_advisor_response(tool_results, llm_json, intent,
+                                         status="need_clarification")
+        return resp.model_copy(update={"summary": clarify})
+
+    return assemble_advisor_response(tool_results, llm_json, intent, status="ok")
