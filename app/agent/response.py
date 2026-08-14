@@ -7,9 +7,12 @@
 """
 from __future__ import annotations
 
+import re
+
 from ..schemas.agent import AgentResponse, MetricRef
 
-__all__ = ["build_metrics", "known_limitations_of", "build_response"]
+__all__ = ["build_metrics", "known_limitations_of", "build_response",
+           "assemble_advisor_response"]
 
 # (key, 中文名, unit, source 字段路径, 取值器)
 _OVERVIEW_SPECS = (
@@ -255,3 +258,93 @@ def _derive_recommendations(intent: str, result: dict) -> list[str]:
     if intent == "EXPLAIN_RESULT":
         return result.get("recommendations") or []
     return []
+
+
+# ---------- V2.2 Advisor 回答组装（metrics 从 tool_results 取，LLM 只定性） ----------
+
+_DIGIT_RE = re.compile(r"\d")
+
+_TOOL_INTENT = {
+    "get_wealth_overview": "VIEW_OVERVIEW",
+    "get_wealth_issues": "CHECK_ISSUES",
+    "get_retirement": "CHECK_RETIREMENT",
+    "get_allocation": "CHECK_ALLOCATION",
+    "get_goals": "CHECK_GOALS",
+    "run_scenario": "SCENARIO_COMPARE",
+    "compare_scenarios": "SCENARIO_COMPARE",
+}
+
+
+def _cashflow_metrics(cashflow: dict) -> list[MetricRef]:
+    """从 cashflow 子块确定性取数（get_cashflow 工具）。"""
+    out = []
+    for key, label, unit in (("income", "月收入", "money"), ("expense", "月支出", "money"),
+                             ("surplus", "月结余", "money"), ("savings_rate", "储蓄率", "pct")):
+        v = cashflow.get(key)
+        if v is not None:
+            out.append(MetricRef(key=f"cashflow_{key}", label=label, unit=unit, value=v,
+                                 source=f"overview.cashflow.{key}"))
+    return out
+
+
+def _metrics_from_tool_results(tool_results: list[dict]) -> list[MetricRef]:
+    """从已执行工具结果确定性取 metrics（value→source 封闭）。
+
+    每个工具按其对应的意图取数；get_family_profile 是「给 LLM 理解」的原始数据，
+    不产出展示指标（跳过）。
+    """
+    out: list[MetricRef] = []
+    for tr in tool_results or []:
+        result = tr.get("result")
+        if not result:
+            continue
+        name = tr.get("name")
+        if name == "get_cashflow":
+            out.extend(_cashflow_metrics(result.get("cashflow") or {}))
+        elif name == "get_wealth_overview":
+            out.extend(build_metrics("VIEW_OVERVIEW", result.get("overview")))
+        elif name in _TOOL_INTENT:
+            out.extend(build_metrics(_TOOL_INTENT[name], result))
+    return out
+
+
+def _strip_numeric_text(text: str | None) -> str | None:
+    """LLM 文字含任何数字 → 返回 None（防编造，数字只来自 metrics）。"""
+    if text is None:
+        return None
+    return None if _DIGIT_RE.search(text) else text
+
+
+def _strip_numeric_list(items: list | None) -> list[str]:
+    """逐条过滤含数字的 LLM 建议/行动。"""
+    out = []
+    for it in items or []:
+        if isinstance(it, str) and not _DIGIT_RE.search(it):
+            out.append(it)
+    return out
+
+
+def assemble_advisor_response(tool_results: list[dict], llm_json: dict | None,
+                              intent: str, status: str = "ok") -> AgentResponse:
+    """组装顾问式 AgentResponse：metrics 来自 tool_results（带 source），LLM 只定性。
+
+    数字防编造：LLM 的 summary/finding/recommendations/next_actions 含数字一律丢弃，
+    数字由 metrics（带 source）承载。
+    """
+    llm_json = llm_json or {}
+    metrics = _metrics_from_tool_results(tool_results)
+    summary = _strip_numeric_text(llm_json.get("summary")) or ""
+    finding = _strip_numeric_text(llm_json.get("finding"))
+    recommendations = _strip_numeric_list(llm_json.get("recommendations"))
+    next_actions = _strip_numeric_list(llm_json.get("next_actions"))
+    return AgentResponse(
+        intent=intent,
+        status=status,
+        summary=summary,
+        finding=finding,
+        metrics=metrics,
+        recommendations=recommendations,
+        next_actions=next_actions,
+        limitations=[],
+        source=[m.source for m in metrics if m.source],
+    )
