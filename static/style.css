@@ -575,6 +575,15 @@ button { font-family: inherit; }
 .layer-chart-block { display: flex; flex-direction: column; gap: 6px; }
 .layer-chart-q { font-size: 13px; color: var(--muted); font-weight: 500; }
 
+/* P2-A VIP 边界价值前置：先基础判断，再展示 VIP 能补什么（金色提示块） */
+.vip-boundary {
+  background: #fff7e6; border: 1px solid #f0dfa2; border-radius: 10px;
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
+}
+.vip-boundary-label { font-size: 12px; font-weight: 700; color: #8a6d1a; }
+.vip-boundary-text { font-size: 13px; line-height: 1.7; color: #4a443c; }
+.vip-boundary .btn-upgrade { align-self: flex-start; }
+
 /* P1.4 建议采纳闭环：⑤下一步每条可单独「＋采纳」 */
 .actionplan-list { display: flex; flex-direction: column; gap: 8px; }
 .actionplan-item {

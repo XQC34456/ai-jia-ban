@@ -76,7 +76,7 @@ def compare_scenario(user: dict, name: str, params: dict) -> dict:
     参数类型/范围非法 → invalid_params（422 等价）；业务不可执行 → unexecutable（400 等价）。
     """
     if user.get("tier") != "vip":
-        raise ToolError("forbidden")
+        raise ToolError("forbidden", {"feature": "情景模拟"})
     resolved = resolve_scenario_name(name)
 
     model = SCENARIO_PARAM_MODELS[resolved]

@@ -240,11 +240,14 @@ def test_handle_disambiguate_pure_calc(client, auth_headers):
     assert "复利" in resp.summary
 
 
-def test_handle_forbidden_free_user(client, auth_headers):
+def test_handle_forbidden_free_user_value_first(client, auth_headers):
+    """P2-A：Free 触发情景模拟 → 先基础判断再展示 VIP 边界（不再冷拒「升级」）。"""
     llm = FakeLLMProvider([{"amount": 300000}])
     resp = handle("我想投资 30 万", _user(auth_headers), llm=llm)
-    assert resp.status == "refused"
-    assert "upgrade" in resp.next_actions
+    assert resp.intent == "SCENARIO_COMPARE"
+    assert resp.status == "ok"                    # 先交付基础价值，非 refused
+    assert resp.vip_boundary                      # 展示 VIP 能补什么
+    assert any("升级" in a for a in resp.next_actions)
 
 
 # ---------- P0 修复 B：router 注入记忆上下文（指代消解） ----------

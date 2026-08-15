@@ -20,3 +20,4 @@ Thumbs.db
 
 # === 测试产物（截图等，不提交）===
 artifacts/
+.verify/

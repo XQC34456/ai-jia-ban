@@ -445,9 +445,9 @@ export const ChatView = {
               </div>
             </div>
 
-            <div v-if="m.agent.layers.judgment" class="layer-block">
+            <div v-if="m.agent.layers.judgment || m.agent.summary" class="layer-block">
               <div class="layer-step">④ 我的判断</div>
-              <div class="agent-finding">{{ m.agent.layers.judgment }}</div>
+              <div class="agent-finding">{{ m.agent.layers.judgment || m.agent.summary }}</div>
             </div>
 
             <div v-if="(m.agent.layers.action_plans && m.agent.layers.action_plans.length) || (m.agent.layers.action_plan && m.agent.layers.action_plan.length)" class="layer-block">
@@ -469,6 +469,12 @@ export const ChatView = {
               <div v-else class="agent-next">
                 <span v-for="(a, i) in m.agent.layers.action_plan" :key="i" class="chip">{{ a }}</span>
               </div>
+            </div>
+
+            <div v-if="m.agent.vip_boundary" class="vip-boundary">
+              <div class="vip-boundary-label">🔒 进一步分析（VIP）</div>
+              <div class="vip-boundary-text">{{ m.agent.vip_boundary }}</div>
+              <button v-if="store.auth.tier !== 'vip'" class="btn-upgrade" @click="doUpgrade">一键升级 VIP</button>
             </div>
 
             <div v-if="m.agent.follow_up_questions && m.agent.follow_up_questions.length" class="layer-block">
@@ -497,6 +503,11 @@ export const ChatView = {
             </ul>
             <div v-if="m.agent.next_actions && m.agent.next_actions.length" class="agent-next">
               <span v-for="(a, i) in m.agent.next_actions" :key="i" class="chip">{{ a }}</span>
+            </div>
+            <div v-if="m.agent.vip_boundary" class="vip-boundary">
+              <div class="vip-boundary-label">🔒 进一步分析（VIP）</div>
+              <div class="vip-boundary-text">{{ m.agent.vip_boundary }}</div>
+              <button v-if="store.auth.tier !== 'vip'" class="btn-upgrade" @click="doUpgrade">一键升级 VIP</button>
             </div>
           </template>
         </div>

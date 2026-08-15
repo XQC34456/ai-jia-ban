@@ -87,7 +87,7 @@ def _run_scenarios(user: dict, name: str, params_list: list[dict]) -> dict:
     id 依序 A/B/C…；params_list 为空时至少跑一个默认参数方案（防御）。
     """
     if user.get("tier") != "vip":
-        raise ToolError("forbidden")
+        raise ToolError("forbidden", {"feature": "情景模拟"})
     resolved = resolve_scenario_name(name)
     model = SCENARIO_PARAM_MODELS[resolved]
     options = []

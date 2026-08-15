@@ -160,6 +160,9 @@ class AgentResponse(BaseModel):
     # ---- P1.2 新增：情景对比原始 comparison（{"A": [9行 baseline/option/delta], ...}），
     #      供 layers 生成 scenario_compare 证据图；缺省 None（非情景意图 / 无对比）。 ----
     scenario_comparison: dict | None = None
+    # ---- P2-A 新增：VIP 边界价值前置。Free 触发情景模拟但未执行（scenario_comparison 为空）时，
+    #      注入确定性的「进一步分析」话术（无数字），先交付基础判断再展示 VIP 能补什么；缺省 None。 ----
+    vip_boundary: str | None = None
     # ---- P1.3 新增：结构化追问（系统缺数检测，非 LLM 编造）。缺省空列表。 ----
     follow_up_questions: list[FollowUpRef] = Field(default_factory=list)
 

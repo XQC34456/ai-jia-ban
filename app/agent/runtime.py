@@ -16,7 +16,8 @@ from .params import extract_scenario_params
 from .provider import LLMProvider
 from .response import build_response
 from .router import refusal_gate, route_intent
-from .tools import ToolError
+from .tools import ToolError, get_issues
+from .vip import value_first
 
 __all__ = ["handle"]
 
@@ -81,7 +82,7 @@ def handle(message: str, user: dict, llm: LLMProvider | None = None,
         try:
             result = dispatch(intent, user, pr.scenario, pr.params)
         except ToolError as e:
-            return _error_response(intent, e)
+            return _error_response(intent, e, user, pr.scenario)
         return build_response(intent, "ok", result, summary=_OK_SUMMARY[intent])
 
     # ③ EXPLAIN_RESULT：复用上下文，不调工具
@@ -100,6 +101,32 @@ def _clarify(missing: list[str]) -> str:
     return _CLARIFY_PREFIX + "、".join(missing)
 
 
-def _error_response(intent: str, err: ToolError) -> AgentResponse:
+def _error_response(intent: str, err: ToolError, user: dict | None = None,
+                    scenario: str | None = None) -> AgentResponse:
+    # P2-A 价值前置：Free 触发情景模拟（forbidden）→ 先给基础判断，再展示 VIP 边界，
+    # 不再冷冰冰「该功能需要升级」。基础判断来自免费基线 get_issues（Decision 确定性），
+    # 数字只走 metrics/source，本层绝不编造。
+    if err.kind == "forbidden" and intent == "SCENARIO_COMPARE":
+        return _vip_value_first_response(user, scenario)
     status, summary, next_actions = map_tool_error(err.kind, err.detail)
     return build_response(intent, status, None, summary=summary, next_actions=next_actions)
+
+
+def _vip_value_first_response(user: dict | None, scenario: str | None) -> AgentResponse:
+    """确定性兜底路径的价值前置响应：基础判断（get_issues 主要矛盾）+ VIP 边界。
+
+    复用 build_response(CHECK_ISSUES) 确定性取数（finding/metrics/recommendations 均来自
+    Decision），再把意图改回 SCENARIO_COMPARE 并注入 vip_boundary；status 保持 ok（已交付
+    基础价值），非 refused。
+    """
+    basic, further = value_first(scenario)
+    issues = get_issues(user) if user else {}
+    base = build_response("CHECK_ISSUES", "ok", issues, summary=basic,
+                          next_actions=["升级 VIP 解锁完整情景模拟"])
+    return base.model_copy(update={
+        "intent": "SCENARIO_COMPARE",
+        "vip_boundary": further,
+        # 基础判断用 summary 承载（情景方向性结论）；不派生「健康体检」finding，
+        # 以免 layered ④判断 喧宾夺主（①结论 已给出主要矛盾）。
+        "finding": None,
+    })

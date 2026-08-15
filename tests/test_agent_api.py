@@ -91,16 +91,17 @@ def test_agent_chat_view_overview_no_key(client, auth_headers, monkeypatch):
             assert m["source"] and m["source"].startswith("overview.")
 
 
-def test_agent_chat_scenario_free_user_refused(client, auth_headers, monkeypatch):
+def test_agent_chat_scenario_free_user_value_first(client, auth_headers, monkeypatch):
     _seed(client, auth_headers)
-    # 注入 FakeLLM 让参数提取成功 → 免费用户命中 VIP 门 → refused
+    # 注入 FakeLLM 让参数提取成功 → 免费用户命中 VIP 门 → 价值前置（基础判断 + VIP 边界）
     monkeypatch.setattr("app.api.agent.get_provider",
                         lambda: FakeLLMProvider([{"amount": 300000}]))
     r = client.post("/api/agent/chat", json={"message": "我想投资 30 万"}, headers=auth_headers)
     assert r.status_code == 200
     body = r.json()
-    assert body["status"] == "refused"
-    assert "upgrade" in body["next_actions"]
+    assert body["status"] == "ok"                  # 先交付基础价值，不再冷拒
+    assert body["vip_boundary"]                    # 展示 VIP 能补什么
+    assert any("升级" in a for a in body["next_actions"])
 
 
 def test_agent_chat_scenario_compare_vip_ok(client, auth_headers, monkeypatch):

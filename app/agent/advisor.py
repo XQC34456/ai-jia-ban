@@ -16,6 +16,7 @@ from .provider import LLMProvider
 from .response import EVIDENCE_METRIC_KEYS, _strip_numeric_text, assemble_advisor_response
 from .tool_schemas import TOOL_SCHEMAS, execute_tool
 from .tools import ToolError
+from .vip import VIP_BOUNDARY
 
 __all__ = ["run_advisor", "advise"]
 
@@ -91,6 +92,11 @@ _ADVISOR_SYSTEM = (
     "（基于系统给出的失效原因，数字由系统提供、你只复述不计算），说明为什么旧判断"
     "不能直接沿用，再基于当前数据重新评估。绝不机械复述旧结论，也绝不自行判断"
     "「是否失效」——失效与否由系统确定性标记，你只负责解释变化并重新判断。\n"
+    "7. VIP 边界：当 run_scenario / compare_scenarios 返回 forbidden（VIP 专属）时，"
+    "绝不编造情景数字，也绝不冷冰冰说「该功能需要升级」。先用你已有的免费数据"
+    "（overview / cashflow / issues）给出方向性的基础判断（定性、不写具体数值），"
+    "再说明完整的情景模拟是 VIP 能力、能补充什么。系统会另外注入「进一步分析」"
+    "说明，你只负责把基础判断说清楚、说人话。\n"
     "最终用自然语言完整回答（结论 + 为什么 + 证据链 + 权衡 + 建议 + 下一步），"
     "不要输出 JSON——结构化输出由系统单独完成，你只管把话说清楚、说人话。"
 )
@@ -263,7 +269,9 @@ def advise(user: dict, message: str, llm: LLMProvider,
         llm_json = {"summary": prose}
 
     if llm_json.get("refuse"):
-        return assemble_advisor_response(tool_results, llm_json, intent, status="refused")
+        return _attach_vip_boundary(
+            assemble_advisor_response(tool_results, llm_json, intent, status="refused"),
+            user, intent)
 
     missing = llm_json.get("missing")
     if missing and isinstance(missing, list) and missing:
@@ -279,8 +287,20 @@ def advise(user: dict, message: str, llm: LLMProvider,
             clarify = _CLARIFY_PREFIX + "、".join(clean_missing)
             return resp.model_copy(update={"summary": clarify, "status": "need_clarification"})
         record_judgment(user, resp)
-        return resp
+        return _attach_vip_boundary(resp, user, intent)
 
     resp = assemble_advisor_response(tool_results, llm_json, intent, status="ok")
     record_judgment(user, resp)
+    return _attach_vip_boundary(resp, user, intent)
+
+
+def _attach_vip_boundary(resp: AgentResponse, user: dict, intent: str) -> AgentResponse:
+    """P2-A：Free 触发情景模拟但未执行（无 scenario_comparison）→ 注入确定性「进一步分析」边界。
+
+    仅当情景确实被 VIP 门挡住（意图为 SCENARIO_COMPARE、Free 用户、无对比结果）才注入；
+    VIP 用户或已产出对比结果时绝不注入（避免误标）。边界文字全定性、无数字。
+    """
+    if (intent == "SCENARIO_COMPARE" and user.get("tier") != "vip"
+            and resp.scenario_comparison is None and not resp.vip_boundary):
+        resp = resp.model_copy(update={"vip_boundary": VIP_BOUNDARY})
     return resp
