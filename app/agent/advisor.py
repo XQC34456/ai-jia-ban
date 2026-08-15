@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 
 from ..schemas.agent import AgentResponse
+from ..schemas.context import AdvisorContext
 from .memory import record_judgment
 from .provider import LLMProvider
 from .response import EVIDENCE_METRIC_KEYS, _strip_numeric_text, assemble_advisor_response
@@ -102,11 +103,68 @@ _ADVISOR_SYSTEM = (
 )
 
 
+_SOURCE_LABELS = {
+    "goals": "目标页", "retirement": "退休规划页", "allocation": "资产配置页",
+    "sandbox": "情景沙盘", "overview": "健康体检页", "chat": "对话",
+}
+
+
+def _resolve_focus(ctx: AdvisorContext) -> str | None:
+    """把 payload 白名单标识解析为对象身份（目标名/情景名），绝不含任何数字。
+
+    只读 family_state 里的对象身份字段（id/name/type）做匹配；gap/monthly_need/
+    score 等聚合数字在此路径不存在（payload 已被白名单剥离，T6），匹配失败静默降级
+    为仅「来源+意图」块。
+    """
+    req = ctx.request
+    payload = req.payload or {}
+    if req.source == "goals":
+        gid = payload.get("goal_id")
+        for g in (ctx.family_state or {}).get("goals") or []:
+            if gid is not None and g.get("id") == gid:
+                name = g.get("name") or "目标"
+                return f"目标「{name}」（{g.get('type')}）"
+        if payload.get("goal_type"):
+            return f"{payload['goal_type']}目标"
+        return None
+    if req.source == "sandbox" and payload.get("scenario_name"):
+        return f"情景「{payload['scenario_name']}」"
+    return None
+
+
+def _advisor_context_block(ctx: AdvisorContext) -> str | None:
+    """把解析层 AdvisorContext 压成顾问可读的【当前情境】块（范围 + 意图，零数字）。
+
+    Step 3（#8 解法）：真实 advisor_path 消费 Context。本块只回答「用户为什么来问、
+    聚焦哪个对象」，让顾问围绕该目标/情景作答——这是「有/无 Context 回答可解释地
+    不同」的机制，不是数字来源。
+
+    T4 硬红线：本块只读 source / intent_hint 与 payload 白名单标识（→ 对象身份），
+    聚合数字（gap/score/dti/monthly_need…）绝不进本块——数字只由 Engine 工具注入。
+    普通对话（source=chat 无 hint 无 payload）返回 None，不注入，保既有基线。
+    """
+    req = ctx.request
+    if req.source == "chat" and not req.intent_hint and not req.payload:
+        return None
+    lines = [f"用户从「{_SOURCE_LABELS.get(req.source, req.source)}」进入，"]
+    if req.intent_hint:
+        lines.append(f"页面建议意图：{req.intent_hint}。")
+    focus = _resolve_focus(ctx)
+    if focus:
+        lines.append(f"聚焦对象：{focus}。")
+    return "\n".join(lines)
+
+
 def _messages_with_context(message: str, wealth_context: str | None,
-                           memory_context: str | None = None) -> list[dict]:
+                           memory_context: str | None = None,
+                           advisor_ctx: AdvisorContext | None = None) -> list[dict]:
     system = _ADVISOR_SYSTEM
     if wealth_context:
         system = f"{system}\n\n【家庭背景】\n{wealth_context}"
+    if advisor_ctx is not None:
+        block = _advisor_context_block(advisor_ctx)
+        if block:
+            system = f"{system}\n\n【当前情境】\n{block}"
     if memory_context:
         system = f"{system}\n\n【记忆】\n{memory_context}"
     return [
@@ -117,13 +175,17 @@ def _messages_with_context(message: str, wealth_context: str | None,
 
 def run_advisor(user: dict, message: str, llm: LLMProvider,
                 wealth_context: str | None = None,
-                memory_context: str | None = None) -> dict | None:
+                memory_context: str | None = None,
+                advisor_ctx: AdvisorContext | None = None) -> dict | None:
     """tool_loop 多轮循环：LLM 选工具 → execute_tool → 结果回传 → 第二轮推理。
 
     返回 {"tool_results": [{"name", "result"}], "content": str | None} 或 None（降级）。
     tool_results 按调用顺序记录（同名工具多次调用各自保留）。
+    advisor_ctx（Phase 1b 解析层）以【当前情境】块注入 system 提示：范围 + 意图 +
+    聚焦对象，零数字（T4）。缺省 None 时行为与改造前一致。
     """
-    messages = _messages_with_context(message, wealth_context, memory_context)
+    messages = _messages_with_context(message, wealth_context, memory_context,
+                                      advisor_ctx)
     tool_results: list[dict] = []
 
     for _ in range(MAX_ROUNDS):
@@ -247,13 +309,16 @@ def _structure_advisor_answer(llm: LLMProvider, prose: str | None,
 def advise(user: dict, message: str, llm: LLMProvider,
            wealth_context: str | None = None,
            memory_context: str | None = None,
-           intent: str = "VIEW_OVERVIEW") -> AgentResponse | None:
+           intent: str = "VIEW_OVERVIEW",
+           advisor_ctx: AdvisorContext | None = None) -> AgentResponse | None:
     """编排 advisor 完整流程：run_advisor → 解析 → refuse/missing → 组装。
 
     返回 AgentResponse，或 None（LLM 失败 / content 无法解析 → 上层确定性兜底）。
+    advisor_ctx（Phase 1b 解析层）经 run_advisor 以【当前情境】块进入顾问提示
+    （范围 + 意图 + 聚焦对象，零数字），缺省 None 时行为与改造前一致。
     """
     raw = run_advisor(user, message, llm, wealth_context=wealth_context,
-                      memory_context=memory_context)
+                      memory_context=memory_context, advisor_ctx=advisor_ctx)
     if raw is None:
         return None
     tool_results = _with_baseline(raw.get("tool_results") or [], intent, user)

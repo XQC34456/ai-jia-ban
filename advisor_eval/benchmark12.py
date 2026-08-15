@@ -132,12 +132,14 @@ BENCHMARK: list[dict] = [
      "messages": ["这个教育金目标怎么完成？"],
      "family": "filed",
      "context": {"source": "goals", "intent_hint": "CHECK_GOALS",
-                 "payload": {"goal_type": "教育", "target_amount": 1000000,
-                             "current_saved": 100000, "gap": 900000},
+                 "payload": {"goal_id": 1, "goal_type": "教育"},
                  "first_turn_action": "直接回答这个目标怎么完成"},
      "expect": {"returned": "AgentResponse", "status": "ok",
                 "accepts": ["AgentResponse"], "gap": "#8 上下文未消费"},
-     "notes": "context 已传入；当前系统是否消费它、首轮是否针对教育金目标"},
+     "notes": "Step 3 修正：payload 改为真实前端契约（goal_id 标识，goal_type 语义），"
+              "移除原泄漏的 target_amount/current_saved/gap 聚合数字（T6 白名单剥离，"
+              "T4 红线：数字只能由 Engine 注入）。goal_id=1 指向 build_family 的教育金目标，"
+              "用于验收『顾问围绕 payload.goal_id 指向的目标回答』"},
 ]
 
 

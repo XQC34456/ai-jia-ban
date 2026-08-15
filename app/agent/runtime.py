@@ -57,7 +57,8 @@ def handle(message: str, user: dict, llm: LLMProvider | None = None,
             # 无 LLM 或失败 → 回退确定性反问。
             if llm is not None:
                 resp = advise(user, message, llm, wealth_context=wealth_context,
-                              memory_context=memory_context, intent="VIEW_OVERVIEW")
+                              memory_context=memory_context, intent="VIEW_OVERVIEW",
+                              advisor_ctx=advisor_ctx)
                 if resp is not None:
                     return resp
             return build_response("EXPLAIN_RESULT", "need_clarification", None,
@@ -78,7 +79,8 @@ def handle(message: str, user: dict, llm: LLMProvider | None = None,
     #    EXPLAIN_RESULT 也走 advisor_path，单轮内由 LLM 调工具解释（跨轮上下文留 V2.4）。
     if llm is not None:
         resp = advise(user, message, llm, wealth_context=wealth_context,
-                      memory_context=memory_context, intent=intent)
+                      memory_context=memory_context, intent=intent,
+                      advisor_ctx=advisor_ctx)
         if resp is not None:
             return resp
 

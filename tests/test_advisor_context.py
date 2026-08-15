@@ -1,10 +1,10 @@
-"""V1.0 Step 2 契约测试：AdvisorContext 不变量冻结（T1–T6，先红后绿）。
+"""V1.0 Step 2+3 契约测试：AdvisorContext 不变量冻结（T1–T7，先红后绿）。
 
 依据：docs/design-advisor-context.md §5/§8（用户 2026-08-15 锁定）。
 铁律：数字唯一来源是 Engine/Decision；Context 永不成为计算来源（T4 = Phase 1 硬红线）。
-零 API 成本（NullProvider 确定性回退），CI 安全。
+零 API 成本（FakeLLMProvider/NullProvider 确定性），CI 安全。
 
-六条不变量（任意一条变红即回归，须有意为之）：
+七条不变量（任意一条变红即回归，须有意为之）：
   T1  context 不得丢：goals context + 模糊消息 → intent 被 SEED 到 intent_hint。
   T1b 用户当前 query 压倒页面 intent_hint（SEED 不是 OVERRIDE）。
   T2  原 query 不得丢：弹建档卡 → 取消 → AppliedResponse.original_query 返回原问题。
@@ -12,15 +12,18 @@
   T4  context 不算数（🔴 硬红线）：payload 塞 gap=999999 → 数字只来自 Engine。
   T5  确定性基线不倒退：无 context 的题路由行为与冻结基线一致（17 锚套件同跑）。
   T6  payload 白名单：各 source 禁止字段被剥离，绝不静默接受。
+  T7  advisor_path 消费 Context（Step 3 硬红线）：同一问题，有/无 Context，
+      顾问回答必须产生可解释的差异；Context 块（【当前情境】）零数字（T4 同源）。
 """
 import json
+import re
 
 import pytest
 
 from app import db
 from app.agent.entry import converse
 from app.agent.profile import apply_confirmation
-from app.agent.provider import NullProvider
+from app.agent.provider import FakeLLMProvider, NullProvider
 from app.schemas.agent import ConfirmCard
 from app.schemas.context import AdvisorContextRequest, build_advisor_context, detect_missing
 
@@ -162,3 +165,68 @@ def test_t6_payload_whitelist_strips_forbidden_fields():
     # 空白名单来源：payload 一律清空
     assert AdvisorContextRequest(source="overview", payload={"score": 51}).payload == {}
     assert AdvisorContextRequest(source="chat", payload={"x": 1}).payload == {}
+
+
+# ---------- T7：advisor_path 消费 Context（Step 3 硬红线） ----------
+
+class _ContextAwareAdvisor(FakeLLMProvider):
+    """按 system 提示是否含聚焦对象返回不同回答：
+    确定性演示「同一问题，有/无 Context，Advisor 回答可解释地不同」。
+    第一轮调 get_goals（工具循环），第二轮按是否看到聚焦对象给不同结论。
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.focused_seen = False
+        self._calls = 0
+
+    def chat(self, messages, tools=None):
+        self.chat_messages.append(list(messages))
+        system = messages[0]["content"] if messages else ""
+        self.focused_seen = "聚焦对象" in system
+        self._calls += 1
+        if self._calls == 1:
+            return {"content": "我先看看家庭目标。",
+                    "tool_calls": [{"id": "c1", "name": "get_goals", "arguments": {}}]}
+        return {"content": ("围绕孩子教育金目标给出安排建议。" if self.focused_seen
+                            else "我先看看你的家庭整体情况。")}
+
+
+def test_t7_advisor_path_consumes_context_explainable_difference(db_):
+    """Step 3 硬红线：同一问题，有/无 Context，Advisor 回答必须产生可解释的差异。
+
+    - 有 Context（goals 页传 goal_id）→ 顾问 system 提示出现【当前情境】聚焦对象
+      （目标名「孩子教育金」），并围绕该目标回答。
+    - 无 Context → 提示无聚焦对象，回答是泛化整体判断。
+    - T4 同源：Context 块（【当前情境】）绝不含任何数字，数字只由 Engine 工具注入。
+    """
+    fid = build_family()
+    user = _user(fid)
+    goals = db_.dump_family(fid).get("goals") or []
+    assert goals, "build_family 必须产出目标供聚焦"
+    goal_row = goals[0]
+    msg = "这个教育金目标怎么完成？"
+    ctx = {"source": "goals", "intent_hint": "CHECK_GOALS",
+           "payload": {"goal_id": goal_row["id"], "goal_type": goal_row.get("type")}}
+
+    # 有 Context：顾问看到聚焦对象，回答围绕该目标
+    llm_with = _ContextAwareAdvisor()
+    r_with = converse(msg, user, llm=llm_with, context=ctx)
+    assert llm_with.focused_seen is True, "有 Context 时顾问必须看到聚焦对象（Context 进入顾问大脑）"
+    assert r_with.intent == "CHECK_GOALS"
+    assert "孩子教育金" in r_with.summary, f"回答必须围绕聚焦目标，实际 summary={r_with.summary!r}"
+
+    # 无 Context：同一问题 → 泛化整体回答（可解释的差异）
+    llm_wo = _ContextAwareAdvisor()
+    r_wo = converse(msg, user, llm=llm_wo)
+    assert llm_wo.focused_seen is False, "无 Context 时提示不应有聚焦对象"
+    assert "孩子教育金" not in r_wo.summary
+    assert r_wo.summary != r_with.summary, "有/无 Context 回答必须可解释地不同"
+
+    # T4 同源：顾问 system 提示里的【当前情境】块零数字（数字只由 Engine 工具注入）
+    system0 = llm_with.chat_messages[0][0]["content"]
+    m = re.search(r"【当前情境】\n(.*?)(?=\n【|\Z)", system0, re.S)
+    assert m, "system 提示必须含【当前情境】块"
+    block = m.group(1)
+    assert re.search(r"\d", block) is None, f"Context 块含数字（T4 红线）：{block!r}"
+    assert "gap" not in block and "monthly_need" not in block
