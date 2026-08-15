@@ -3,12 +3,12 @@
 //   - 对话建档走 /api/agent/chat → /api/confirm，决策走 /api/decision，报告走 /api/report；
 //     本页只展示后端返回，不计算任何财富结论。
 //   - 建档落地（type=applied）后只「失效缓存」，由其它视图按需重拉（确保财富结论始终来自后端）。
-import { store, upgrade } from '../store.js';
+import { store, upgrade, adoptAction, loadActionPlan } from '../store.js';
 import { api, ApiError } from '../api.js';
 import { fmtMoney, fmtPct, fmtRatio } from '../format.js';
 import { HealthRadar, CashflowChart, AllocationDonut, DebtGauge, ProtectionGap, GoalProgress, RetirementGap, ScenarioCompare } from '../charts.js';
 
-const { reactive, ref, computed, nextTick } = Vue;
+const { reactive, ref, computed, nextTick, onMounted } = Vue;
 
 // ---------- 五层回答：图表组件名 → charts.js 组件（只读 props.data，零计算） ----------
 const CHART_COMPONENTS = {
@@ -103,6 +103,22 @@ export const ChatView = {
     const chatInputEl = ref(null);
     const sending = ref(false);
     const chatError = ref('');
+
+    // —— 行动计划（P1.4：⑤下一步可采纳，与风险问题页共用 issue_id+action 去重）——
+    const planError = ref(null);
+    const adoptedSet = computed(() => {
+      const s = new Set();
+      const plans = (store.actionPlan.data && store.actionPlan.data.plans) || [];
+      for (const p of plans) if (p.status === 'todo') s.add(p.issue_id + '|' + p.action);
+      return s;
+    });
+    onMounted(() => { loadActionPlan().catch(() => {}); });
+    async function adoptFromChat(ap) {
+      planError.value = null;
+      try {
+        await adoptAction({ issue_id: ap.issue_id, action: ap.action, detail: ap.detail });
+      } catch (e) { planError.value = e.message || '采纳失败'; }
+    }
 
     // —— 决策模拟 ——
     const decisionOpen = ref(false);
@@ -348,6 +364,7 @@ export const ChatView = {
 
     return {
       store, input, sending, chatError, send, confirm, onKey, fillInput,
+      planError, adoptedSet, adoptFromChat,
       DECISION_SCENARIOS, SCENARIO_KEYS,
       decisionOpen, decisionScenario, decisionParams, decisionResult, decisionBusy, decisionError,
       openDecision, pickDecisionScenario, runDecision, doUpgrade,
@@ -433,9 +450,23 @@ export const ChatView = {
               <div class="agent-finding">{{ m.agent.layers.judgment }}</div>
             </div>
 
-            <div v-if="m.agent.layers.action_plan && m.agent.layers.action_plan.length" class="layer-block">
+            <div v-if="(m.agent.layers.action_plans && m.agent.layers.action_plans.length) || (m.agent.layers.action_plan && m.agent.layers.action_plan.length)" class="layer-block">
               <div class="layer-step">⑤ 下一步</div>
-              <div class="agent-next">
+              <div v-if="planError" class="err-box"><span>{{ planError }}</span></div>
+              <!-- P1.4：可采纳结构（新链路） -->
+              <div v-if="m.agent.layers.action_plans && m.agent.layers.action_plans.length" class="actionplan-list">
+                <div v-for="(ap, i) in m.agent.layers.action_plans" :key="i" class="actionplan-item">
+                  <div class="actionplan-text">
+                    <span class="actionplan-action">{{ ap.action }}</span>
+                    <span v-if="ap.detail" class="actionplan-detail">{{ ap.detail }}</span>
+                  </div>
+                  <button v-if="!adoptedSet.has(ap.issue_id + '|' + ap.action)"
+                          class="btn-mini rec-adopt" @click="adoptFromChat(ap)">＋ 采纳</button>
+                  <span v-else class="rec-adopted">已加入计划</span>
+                </div>
+              </div>
+              <!-- 旧扁平兜底（旧缓存无 action_plans） -->
+              <div v-else class="agent-next">
                 <span v-for="(a, i) in m.agent.layers.action_plan" :key="i" class="chip">{{ a }}</span>
               </div>
             </div>

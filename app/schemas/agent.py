@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, model_validator
 __all__ = [
     "AGENT_INTENTS", "INTENT_TO_ENDPOINT", "INTENT_SUBFIELD", "SCENARIO_ALIASES",
     "MetricRef", "PriorityRef", "EvidenceRef", "TradeoffRef", "UncertaintyRef",
-    "FollowUpRef", "ChartBlock", "AdvisorLayers",
+    "FollowUpRef", "ActionPlanRef", "ChartBlock", "AdvisorLayers",
     "AgentResponse", "AgentRequest",
 ]
 
@@ -111,6 +111,14 @@ class FollowUpRef(BaseModel):
     reason: str
 
 
+class ActionPlanRef(BaseModel):
+    """⑤ 下一步里可采纳的建议：来自 Decision recommendations（确定性），供前端「＋采纳」落地 action_plan。"""
+    recommendation_id: str
+    issue_id: str
+    action: str
+    detail: str | None = None
+
+
 # ---------- V2.6 五层结构化回答契约：系统层 vs LLM 叙事层分离 ----------
 
 class ChartBlock(BaseModel):
@@ -127,7 +135,8 @@ class AdvisorLayers(BaseModel):
     changes: list[dict] = Field(default_factory=list)   # ② 关键变化（review-status stale_reasons）
     charts: list[ChartBlock] = Field(default_factory=list)  # ③ 财务画像（按用户问题触发）
     judgment: str | None = None                         # ④ 我的判断（LLM 叙事层）
-    action_plan: list[str] = Field(default_factory=list)   # ⑤ 下一步行动
+    action_plan: list[str] = Field(default_factory=list)   # ⑤ 下一步行动（人话短句，向后兼容）
+    action_plans: list[ActionPlanRef] = Field(default_factory=list)  # ⑤ 可采纳结构（P1.4，供「＋采纳」落地）
 
 
 class AgentResponse(BaseModel):

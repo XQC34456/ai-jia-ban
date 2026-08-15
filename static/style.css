@@ -575,6 +575,17 @@ button { font-family: inherit; }
 .layer-chart-block { display: flex; flex-direction: column; gap: 6px; }
 .layer-chart-q { font-size: 13px; color: var(--muted); font-weight: 500; }
 
+/* P1.4 建议采纳闭环：⑤下一步每条可单独「＋采纳」 */
+.actionplan-list { display: flex; flex-direction: column; gap: 8px; }
+.actionplan-item {
+  display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+}
+.actionplan-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.actionplan-action { font-size: 13px; font-weight: 600; color: var(--brand-dark); }
+.actionplan-detail { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.actionplan-item .rec-adopt { flex-shrink: 0; align-self: center; }
+
 /* P1.3 结构化追问：系统缺数检测出的问题，点一下回填输入框直接作答 */
 .followup-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .followup-chip {

@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 from .. import db
-from ..schemas.agent import AdvisorLayers, AgentResponse, ChartBlock, FollowUpRef
+from ..schemas.agent import AdvisorLayers, ActionPlanRef, AgentResponse, ChartBlock, FollowUpRef
 from ..services import build_overview
 from .followup import follow_up_questions
 from .memory import INVALIDATION_LABELS
@@ -133,20 +133,32 @@ def _build_scenario_chart(comparison: dict) -> ChartBlock | None:
     )
 
 
-def _build_action_plan(overview: dict) -> list[str]:
-    """⑤ 下一步行动：来自 Decision build_issues 的动作化建议（确定性，非 LLM）。
+def _build_action_plans(overview: dict) -> list[dict]:
+    """⑤ 下一步的可采纳结构：来自 Decision recommendations，逐字透传 action/detail，
+    从 recommendation_id（{issue_id}-R{idx}）解析 issue_id，供「＋采纳」落地 action_plan。
 
-    只读 overview.recommendations（{action, detail, ...}），拼成「动作：细节」短句，
-    绝不自造建议、绝不填数字。
+    只读确定性 recommendations，绝不计算财富数字、绝不自造建议。
     """
     out = []
     for rec in (overview.get("recommendations") or [])[:3]:
         action = rec.get("action")
-        detail = rec.get("detail")
         if not action:
             continue
-        out.append(f"{action}：{detail}" if detail else action)
+        rid = rec.get("recommendation_id") or ""
+        issue_id = rid.rsplit("-R", 1)[0] if "-R" in rid else rid
+        out.append({
+            "recommendation_id": rid,
+            "issue_id": issue_id,
+            "action": action,
+            "detail": rec.get("detail"),
+        })
     return out
+
+
+def _build_action_plan(overview: dict) -> list[str]:
+    """⑤ 下一步行动（人话短句，向后兼容）：由可采纳结构拼成「动作：细节」，绝不自造。"""
+    return [f"{r['action']}：{r['detail']}" if r["detail"] else r["action"]
+            for r in _build_action_plans(overview)]
 
 
 def attach_layers(resp: AgentResponse, family_id: int,
@@ -175,6 +187,7 @@ def attach_layers(resp: AgentResponse, family_id: int,
         charts=charts,
         judgment=resp.finding,
         action_plan=_build_action_plan(overview),
+        action_plans=[ActionPlanRef(**a) for a in _build_action_plans(overview)],
     )
     # ⑥ 结构化追问：系统缺数检测（deterministic），与五层同源、同幂等。
     follow_ups = [FollowUpRef(**f) for f in follow_up_questions(resp.intent, data)]
