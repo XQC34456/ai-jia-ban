@@ -21,6 +21,43 @@ __all__ = ["run_advisor", "advise"]
 
 MAX_ROUNDS = 6
 
+# P1.1：确定性基线 —— 系统保证「意图 → 必需 Engine 数据」，不随 LLM 工具选择漂移。
+# 每意图恒带 get_wealth_issues（主要矛盾 priorities[0] 定主次），再配意图主工具。
+# 只保证 assemble 取数确定性（不回注 LLM 循环：LLM 已从 wealth_context 文本看到关键数字）。
+_BASELINE_TOOLS: dict[str, tuple[str, ...]] = {
+    "VIEW_OVERVIEW": ("get_wealth_overview", "get_wealth_issues"),
+    "CHECK_ISSUES": ("get_wealth_issues", "get_wealth_overview"),
+    "CHECK_RETIREMENT": ("get_retirement", "get_wealth_issues"),
+    "CHECK_ALLOCATION": ("get_allocation", "get_wealth_issues"),
+    "CHECK_GOALS": ("get_goals", "get_wealth_issues"),
+    "SCENARIO_COMPARE": ("get_wealth_overview", "get_wealth_issues"),
+    "EXPLAIN_RESULT": ("get_wealth_issues",),
+}
+
+
+def _with_baseline(tool_results: list[dict], intent: str, user: dict) -> list[dict]:
+    """把意图必需的确定性基线补进 tool_results，保证 assemble 取数确定。
+
+    LLM 已调过（且非 error）的同名工具不重复补；基线工具异常（ToolError）静默跳过，
+    不因单一工具失败丢掉整条基线。返回 baseline 在前、LLM 工具结果在后的新列表。
+
+    基线只在顾问「已进入财富诊断」（至少调了一个工具）时补全：纯聊天/知识问答/拒算
+    （零工具）不应注入财富画像（否则「今天天气怎么样」会带出一堆财富指标）。
+    """
+    if not tool_results:
+        return []
+    have = {tr.get("name") for tr in tool_results if tr.get("result") is not None}
+    baseline: list[dict] = []
+    for name in _BASELINE_TOOLS.get(intent, ()):
+        if name in have:
+            continue
+        try:
+            result = execute_tool(name, {}, user)
+        except ToolError:
+            continue
+        baseline.append({"name": name, "result": result})
+    return baseline + tool_results
+
 _ADVISOR_SYSTEM = (
     "你是家庭财富顾问。你的价值不是「回答财富问题」，而是「站在这个家庭的位置，"
     "帮它做一个更好的决策」。\n"
@@ -213,7 +250,7 @@ def advise(user: dict, message: str, llm: LLMProvider,
                       memory_context=memory_context)
     if raw is None:
         return None
-    tool_results = raw.get("tool_results") or []
+    tool_results = _with_baseline(raw.get("tool_results") or [], intent, user)
     llm_json = _structure_advisor_answer(llm, raw.get("content"), message)
     if llm_json is None:
         # structure 阶段失败但 tool_loop 已产出散文 → 用散文兜底（回答可用性），不整体降级。

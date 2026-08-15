@@ -142,6 +142,9 @@ class AgentResponse(BaseModel):
     uncertainty: UncertaintyRef | None = None
     # ---- V2.6 新增（只扩不减，缺省 None → 前端走旧扁平渲染兜底） ----
     layers: AdvisorLayers | None = None
+    # ---- P1.2 新增：情景对比原始 comparison（{"A": [9行 baseline/option/delta], ...}），
+    #      供 layers 生成 scenario_compare 证据图；缺省 None（非情景意图 / 无对比）。 ----
+    scenario_comparison: dict | None = None
 
 
 class AgentRequest(BaseModel):

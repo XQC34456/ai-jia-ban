@@ -85,7 +85,7 @@ def test_structure_fail_prose_digits_stripped(family, monkeypatch):
 
 
 def test_structure_fail_prose_digits_keeps_deterministic_metrics(family, monkeypatch):
-    """structure 失败 + prose 含数字 → summary 可空，但确定性 metrics 仍在，response 非空回答。"""
+    """structure 失败 + prose 含数字 → LLM 编造数字不进 summary，但确定性 metrics/priorities 仍在。"""
     monkeypatch.setattr(advisor_mod, "_structure_advisor_answer", lambda *a, **k: None)
     fake = FakeLLMProvider(chat_script=[
         {"content": None,
@@ -94,8 +94,9 @@ def test_structure_fail_prose_digits_keeps_deterministic_metrics(family, monkeyp
     ])
     resp = advise(_user(family), "帮我看看", fake)
     assert resp is not None
-    assert not any(ch.isdigit() for ch in resp.summary)  # 数字 strip
+    assert "备用金" not in resp.summary  # LLM 编造的「留出 20 万备用金」不进 summary（防编造闸）
     assert resp.metrics  # 确定性兜底：metrics 非空，response 不是空回答
+    assert resp.priorities  # P1.1 基线：已调工具 → 补 get_wealth_issues → 主要矛盾恒在
 
 
 def test_structure_fail_no_prose_returns_none(family, monkeypatch):

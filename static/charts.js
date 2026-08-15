@@ -294,3 +294,66 @@ export const ProtectionMembers = defineChart((data) => {
     }],
   };
 });
+
+// —— ⑪ 情景对比图：回答「这个决定会让你家更好还是更差？」 ——
+// 只读 compare_scenarios 已算好的 baseline/option（确定性产出），零计算。
+// 各指标单位不同（元/月/%/分/万），故每指标独立刻度（small multiples），绝不混用一个轴误导。
+const SCENARIO_VAL_FMT = {
+  money: (v) => fmtMoney(v),
+  pct: (v) => (Number(v) * 100).toFixed(1) + '%',
+  ratio: (v) => Number(v).toFixed(2) + '×',
+  months: (v) => v + ' 个月',
+  score: (v) => Number(v).toFixed(0) + ' 分',
+};
+function scenarioVal(unit, v) {
+  if (v == null) return '—';
+  const f = SCENARIO_VAL_FMT[unit];
+  return f ? f(v) : String(v);
+}
+
+export const ScenarioCompare = defineChart((data) => {
+  const rows = (data && data.series) || [];
+  if (!rows.length) return null;
+  const panelH = 44;
+  const grids = [], xAxes = [], yAxes = [], series = [];
+  rows.forEach((r, i) => {
+    const a = r.baseline == null ? null : Number(r.baseline);
+    const b = r.option == null ? null : Number(r.option);
+    const lo = Math.min(0, a ?? 0, b ?? 0);
+    const hi = Math.max(0, a ?? 0, b ?? 0);
+    const top = 6 + i * panelH;
+    grids.push({ left: 78, right: 96, top, height: panelH - 8 });
+    xAxes.push({
+      type: 'value', gridIndex: i, min: lo, max: hi,
+      axisLabel: { show: false }, splitLine: { show: false },
+      axisLine: { show: false }, axisTick: { show: false },
+    });
+    yAxes.push({
+      type: 'category', gridIndex: i, data: [r.label],
+      axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { fontSize: 12, color: '#5b616b', width: 68, overflow: 'truncate' },
+    });
+    series.push({
+      name: '现状', type: 'bar', xAxisIndex: i, yAxisIndex: i, barWidth: 7, barGap: '30%',
+      data: [a], itemStyle: { color: '#5ac8fa', borderRadius: [3, 0, 0, 3] },
+      label: { show: a != null, position: 'right', fontSize: 11, color: '#5ac8fa',
+               formatter: () => scenarioVal(r.unit, a) },
+    });
+    series.push({
+      name: '方案', type: 'bar', xAxisIndex: i, yAxisIndex: i, barWidth: 7,
+      data: [b], itemStyle: { color: '#ff9500', borderRadius: [3, 0, 0, 3] },
+      label: { show: b != null, position: 'right', fontSize: 11, color: '#ff9500',
+               formatter: () => scenarioVal(r.unit, b) },
+    });
+  });
+  return {
+    tooltip: {
+      trigger: 'item',
+      formatter: (p) => {
+        const row = rows[Math.floor(p.seriesIndex / 2)];
+        return `${row.label}<br/>${p.seriesName}：${scenarioVal(row.unit, p.value)}`;
+      },
+    },
+    grid: grids, xAxis: xAxes, yAxis: yAxes, series,
+  };
+}, '300px');

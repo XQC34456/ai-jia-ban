@@ -83,6 +83,23 @@ def _compare_metrics(result: dict) -> list[MetricRef]:
     return out
 
 
+def _extract_scenario_comparison(tool_results: list[dict] | None,
+                                 result: dict | None) -> dict | None:
+    """提取情景对比原始 comparison（{"A": [9行 baseline/option/delta], ...}），供场景图渲染。
+
+    确定性路径：result 直接是 compare_scenarios 结果（含 comparison）；
+    advisor 路径：扫 run_scenario / compare_scenarios 工具结果取 comparison。
+    本层只搬运原始结构，绝不加工财富数字。
+    """
+    if isinstance(result, dict) and isinstance(result.get("comparison"), dict):
+        return result["comparison"]
+    for tr in tool_results or []:
+        r = tr.get("result")
+        if isinstance(r, dict) and isinstance(r.get("comparison"), dict):
+            return r["comparison"]
+    return None
+
+
 # ---------- CHECK_ISSUES / CHECK_GOALS / EXPLAIN_RESULT 取数（P1 修复） ----------
 # 问题由 build_issues/build_goals 决定，本层只读字段映射成 MetricRef，绝不编数字。
 
@@ -201,6 +218,8 @@ def build_response(intent: str, status: str, result: dict | None = None,
         finding = _derive_finding(intent, result)
     if recommendations is None and result:
         recommendations = _derive_recommendations(intent, result)
+    scenario_comparison = (_extract_scenario_comparison(None, result)
+                           if intent == "SCENARIO_COMPARE" else None)
     return AgentResponse(
         intent=intent,
         status=status,
@@ -211,6 +230,7 @@ def build_response(intent: str, status: str, result: dict | None = None,
         next_actions=next_actions or [],
         limitations=known_limitations_of(result),
         source=[m.source for m in metrics if m.source],
+        scenario_comparison=scenario_comparison,
     )
 
 
@@ -534,6 +554,8 @@ def assemble_advisor_response(tool_results: list[dict], llm_json: dict | None,
     evidence = _build_evidence(tool_results, llm_json.get("evidence"))
     tradeoffs = _build_tradeoffs(llm_json.get("tradeoffs"))
     uncertainty = _build_uncertainty(llm_json.get("uncertainty"))
+    scenario_comparison = (_extract_scenario_comparison(tool_results, None)
+                           if intent == "SCENARIO_COMPARE" else None)
     return AgentResponse(
         intent=intent,
         status=status,
@@ -548,4 +570,5 @@ def assemble_advisor_response(tool_results: list[dict], llm_json: dict | None,
         evidence=evidence,
         tradeoffs=tradeoffs,
         uncertainty=uncertainty,
+        scenario_comparison=scenario_comparison,
     )

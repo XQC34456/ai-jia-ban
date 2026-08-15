@@ -6,7 +6,7 @@
 import { store, upgrade } from '../store.js';
 import { api, ApiError } from '../api.js';
 import { fmtMoney, fmtPct, fmtRatio } from '../format.js';
-import { HealthRadar, CashflowChart, AllocationDonut, DebtGauge, ProtectionGap, GoalProgress, RetirementGap } from '../charts.js';
+import { HealthRadar, CashflowChart, AllocationDonut, DebtGauge, ProtectionGap, GoalProgress, RetirementGap, ScenarioCompare } from '../charts.js';
 
 const { reactive, ref, computed, nextTick } = Vue;
 
@@ -19,6 +19,7 @@ const CHART_COMPONENTS = {
   protection: ProtectionGap,
   goals: GoalProgress,
   retirement: RetirementGap,
+  scenario_compare: ScenarioCompare,
 };
 function chartComponent(name) { return CHART_COMPONENTS[name] || null; }
 

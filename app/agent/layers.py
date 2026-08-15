@@ -45,7 +45,7 @@ _INTENT_CHARTS: dict[str, list[tuple[str, str, object]]] = {
     "CHECK_GOALS": [
         ("goals", "哪个目标落后？钱够不够？", _goals),
     ],
-    "SCENARIO_COMPARE": [],   # 对比走表格（决策模拟弹窗），非图表
+    "SCENARIO_COMPARE": [],   # 走 _build_scenario_chart（baseline vs 方案证据图），非 overview 画像块
     "EXPLAIN_RESULT": [],     # 纯解释，无端点、无画像
 }
 
@@ -102,6 +102,36 @@ def _build_charts(intent: str, overview: dict) -> list[ChartBlock]:
     return out
 
 
+# 情景证据图只取 5 个最扎眼指标（现金流/应急/DTI/净资产/评分），避免一屏 9 组过密。
+_SCENARIO_CHART_METRICS = ("cashflow", "liquidity", "dti", "net_worth", "wealth_score")
+
+
+def _build_scenario_chart(comparison: dict) -> ChartBlock | None:
+    """③ 情景证据图：baseline vs 方案的关键指标对比。
+
+    comparison = {"A": [9行 ComparisonMetric(baseline/option/delta)]，...}；单方案取 A，
+    只读 baseline/option（对比值由 compare_scenarios 确定性算出），绝不加工财富数字。
+    """
+    rows = (comparison or {}).get("A") or []
+    by_key = {row["key"]: row for row in rows if isinstance(row, dict)}
+    series = []
+    for key in _SCENARIO_CHART_METRICS:
+        row = by_key.get(key)
+        if not row:
+            continue
+        series.append({
+            "key": row["key"], "label": row["label"], "unit": row["unit"],
+            "baseline": row.get("baseline"), "option": row.get("option"),
+        })
+    if not series:
+        return None
+    return ChartBlock(
+        chart="scenario_compare",
+        question="这个决定会让你家更好还是更差？",
+        data={"series": series},
+    )
+
+
 def _build_action_plan(overview: dict) -> list[str]:
     """⑤ 下一步行动：来自 Decision build_issues 的动作化建议（确定性，非 LLM）。
 
@@ -131,10 +161,16 @@ def attach_layers(resp: AgentResponse, family_id: int,
     if resp.status != "ok":
         return resp   # 澄清/拒绝/错误 → 旧扁平渲染，不套五层
     overview = build_overview(db.dump_family(family_id))
+    # 情景对比走专用证据图（baseline vs 方案分组条形图），不再用 overview 画像块。
+    if resp.intent == "SCENARIO_COMPARE" and resp.scenario_comparison:
+        scenario_chart = _build_scenario_chart(resp.scenario_comparison)
+        charts = [scenario_chart] if scenario_chart else []
+    else:
+        charts = _build_charts(resp.intent, overview)
     layers = AdvisorLayers(
         conclusion=_build_conclusion(overview),
         changes=_build_changes(invalidation),
-        charts=_build_charts(resp.intent, overview),
+        charts=charts,
         judgment=resp.finding,
         action_plan=_build_action_plan(overview),
     )
