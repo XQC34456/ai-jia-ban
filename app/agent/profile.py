@@ -250,6 +250,20 @@ def _record_goal_fact(family_id: int, action: dict[str, Any]) -> None:
                     source="chat_confirmed", confidence="confirmed")
 
 
+def _record_provenance(family_id: int, rc: ReconciledAction, status: str,
+                       **extra) -> None:
+    """来源追踪（第三刀）：确认后把本条动作的来源记成 product_event。
+
+    只做「这条事实从哪里来」的可查询事件：new（新声明）/ exists（既有复用）/
+    conflict_overwrite（覆盖，带 matched_id=被改行 + prev_value=改前值）/
+    conflict_ambiguous（多匹配歧义，不定位）。不碰档案表、不注入 LLM。
+    """
+    meta = {"status": status, "kind": rc.action["kind"],
+            "summary": rc.action["summary"]}
+    meta.update(extra)
+    db.record_event(family_id, "filing_provenance", intent="filing", meta=meta)
+
+
 def cancel_confirmation(family_id: int, pending_id: str
                         ) -> tuple[AppliedResponse, str | None, object]:
     """弹出并消费 pending 的「取消」分支（Step 4，G3 底座）。
@@ -290,6 +304,7 @@ def apply_confirmation(family_id: int, pending_id: str, confirmed: bool) -> Appl
         a = rc.action
         if rc.status == "exists":
             skip_notes.append(f"{a['summary']} 已在档案")
+            _record_provenance(family_id, rc, "exists")
             continue
         if rc.status == "conflict":
             if rc.matched_id is not None and rc.table:
@@ -302,13 +317,17 @@ def apply_confirmation(family_id: int, pending_id: str, confirmed: bool) -> Appl
                 db.update_entity(rc.table, rc.matched_id, value_fields)
                 applied_summaries.append(a["summary"])
                 _record_goal_fact(family_id, a)
+                _record_provenance(family_id, rc, "conflict_overwrite",
+                                   matched_id=rc.matched_id, prev_value=rc.archive_value)
             else:
                 # 多匹配歧义：宁可让用户确认，也不替用户猜哪一笔该覆盖 → 不动
                 skip_notes.append(f"{a['summary']} 档案有多笔记录，未自动改动")
+                _record_provenance(family_id, rc, "conflict_ambiguous")
             continue
         db.apply_action(family_id, a)
         applied_summaries.append(a["summary"])
         _record_goal_fact(family_id, a)
+        _record_provenance(family_id, rc, "new")
     if applied_summaries:
         message = f"已记录：{'、'.join(applied_summaries)}。"
     else:

@@ -745,6 +745,18 @@ def record_event(family_id: int, event_type: str, intent: str | None = None,
     })
 
 
+def get_product_events(family_id: int, event_type: str | None = None) -> list[dict[str, Any]]:
+    """只读：查家庭的产品事件，meta 已解析；可叠加 event_type 过滤。
+
+    复用 list_events（按 id 升序 + meta 解析），只叠加事件类型过滤；
+    供来源追踪报表/测试使用，绝不参与财富计算、绝不回写主表。
+    """
+    events = list_events(family_id)
+    if event_type is not None:
+        events = [e for e in events if e["event_type"] == event_type]
+    return events
+
+
 def list_events(family_id: int | None = None, limit: int = 5000) -> list[dict]:
     """按时间正序返回产品事件（family_id=None 时返回全量，供报表脚本观察）。"""
     if family_id is None:
