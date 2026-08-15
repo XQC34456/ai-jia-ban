@@ -471,7 +471,9 @@ def _fallback_summary(priorities: list[PriorityRef]) -> str:
     if priorities:
         p = priorities[0]
         s = f"当前最需要关注：{p.title}"
-        if p.finding:
+        # 展示层裁定 §6：数字不得内联进 summary（数字以 MetricRef/evidence 呈现）。
+        # finding 含数字 → 不注入；保证任何 detector 的 finding 都进不了 prose。
+        if p.finding and not _DIGIT_RE.search(p.finding):
             s += f"（{p.finding}）"
         return s
     return "已生成家庭财务分析，详见下方画像与下一步行动。"

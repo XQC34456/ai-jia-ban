@@ -165,14 +165,29 @@ message + context
 
 ---
 
-## 6. 展示层裁定（立方向，**不**在 Phase 1b 实现）
+## 6. 展示层裁定（Phase 1b 立方向 → 2026-08-16 独立小任务已实现）
 
-基准发现 Q11 真实模式 summary 含"配置适配度 **51 分**"→ 触发铁律·数字无编造。根因：`detect.py:174` finding 带数字，P1.1 把它当 severity 注入 summary（layers.py:78）。
+基准发现 Q11 真实模式 summary 含"配置适配度 **51 分**"→ 触发铁律·数字无编造。**实际根因（2026-08-16 代码取证）**：
+`detect.py:174` allocation finding 带数字 → `_build_priorities`（response.py:449）逐字透传进
+`PriorityRef.finding` → `_fallback_summary`（response.py:465）把 finding 内联进 summary prose
+（真实 LLM summary 含数字被防编造闸剥空后必走此兜底）。数字真值早已在
+`metric.allocation_fitness`（`_issue_metrics` 已 surface 成 MetricRef，数字载体成立），
+缺的只是 prose 侧泄漏。
 
 **裁定方向（用户已确认，不在此放宽铁律）**：
 - Engine finding **内部可以**保留数值（issue 记录是内部数据）。
 - 但进入**用户文案的结构化 severity/summary 层**时，数字不得内联——改以 `MetricRef`（evidence 卡片）呈现，severity/finding 文案去数字（"资产配置适配度偏低"，数字活在 metrics+evidence）。
 - 这是一处独立的展示层小改（detect/layers/response），**归属 Phase 1c 或之后**，Phase 1b 只记录方向，不实现。
+
+**已实现（2026-08-16，独立 commit，两层级防线）**：
+1. **修源头**：`detect_allocation` finding/reason 去数字 → 定性「当前资产结构偏离目标配置」，真值留在 `metric.allocation_fitness`。
+2. **修兜底**：`_fallback_summary` 加数字守卫（finding 含数字不注入），任何 detector 的 finding 都进不了 summary prose。
+
+只动 ALLOCATION_LOW_FITNESS 一条；其余 7 个 detect 的系统性数字模式记录为后续任务（Q4/Q5/Q12
+CHECK_GOALS 泄漏已是冻结基线已知失败 iron_ok=False，不扩大）。验证：新增 T-D1/D2/D3 全绿、
+12 题确定性基线签名零 diff、全量 572 pytest 绿、真实 12 题「51 分」prose 0 次（只在
+evidence/metrics，如 `allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness`）、
+铁律·数字无编造 12/12 ✅。
 
 ---
 

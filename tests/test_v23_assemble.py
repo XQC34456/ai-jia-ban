@@ -14,7 +14,8 @@ def _issues_result():
         "data_origin": "real",
         "issues": [
             {"issue_id": "emergency", "type": "liquidity", "severity": "P0",
-             "title": "应急金不足", "finding": "应急金不足3个月"},
+             "title": "应急金不足", "finding": "应急金不足3个月",
+             "metric": {"emergency_months": 3.0}},
         ],
         "alerts": ["应急金不足"],
         "priorities": [
@@ -75,9 +76,10 @@ def test_assemble_uncertainty_normalizes_invalid_confidence():
 
 
 def test_assemble_summary_fallback_when_llm_summary_has_digit():
-    """P0 修复：LLM summary 含数字被防编造闸剥离后，用 priorities 确定性兜底，绝不留空回复。
+    """展示层裁定 §6：LLM summary 含数字被防编造闸剥离后，用 priorities 确定性兜底，绝不留空回复。
 
-    数字来自 issue.finding（Decision 确定性生成），非 LLM 编造，符合铁律。
+    数字**不得内联进 summary prose**——由 MetricRef（metrics/evidence）承载；
+    兜底 summary 只含 title + 定性 finding。
     """
     tool_results = [{"name": "get_wealth_issues", "result": _issues_result()}]
     # LLM 违反「summary 不写数字」→ 整段被 strip 成空，之前用户看到空回复。
@@ -85,7 +87,10 @@ def test_assemble_summary_fallback_when_llm_summary_has_digit():
     resp = assemble_advisor_response(tool_results, llm_json, "CHECK_ISSUES")
     assert resp.summary  # 不再空
     assert "应急金不足" in resp.summary          # 确定性 priorities[0].title
-    assert "3个月" in resp.summary              # 数字来自 issue.finding（系统算）
+    assert "3个月" not in resp.summary           # §6：数字不进 prose（finding 数字被守卫拦截）
+    # 数字以 MetricRef 呈现：issue.metric → metrics（带 source）
+    assert any(m.key == "emergency_emergency_months" and m.value == 3.0
+               and m.source for m in resp.metrics)
 
 
 def test_assemble_summary_fallback_without_priorities():

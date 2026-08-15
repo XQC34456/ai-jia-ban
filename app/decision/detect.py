@@ -161,17 +161,18 @@ def detect_allocation(fd: dict, ctx: dict) -> dict | None:
         return None
     sev = "P0" if score < 30 else "P1"
     recs = [_rec(_action_text(a), _detail_text(a),
-                 reason=f"配置适配度 {score} 分，偏离目标配置",
+                 reason="配置适配度偏低，偏离目标配置",
                  target=_target_for(a), scenario="invest")
             for a in alloc["adjustments"][:2]]
     if not recs:
         recs = [_rec("调整资产配置", "按目标配置逐步增配低配大类、减配超配大类",
-                     reason=f"配置适配度 {score} 分，偏离目标配置",
+                     reason="配置适配度偏低，偏离目标配置",
                      target={"allocation_fitness": 60}, scenario="invest")]
     return {
         "issue_id": "ALLOCATION_LOW_FITNESS_001", "type": "allocation", "severity": sev,
         "title": "资产配置适配度偏低",
-        "finding": f"配置适配度 {score} 分",
+        # 定性描述（展示层裁定 §6）：数字真值在 metric.allocation_fitness（MetricRef 载体）
+        "finding": "当前资产结构偏离目标配置",
         "reason": list(fit["reasons"]) or ["当前配置偏离目标配置"],
         "metric": {"allocation_fitness": score,
                    "real_estate_pct": fit["concentration"]["real_estate_pct"],
