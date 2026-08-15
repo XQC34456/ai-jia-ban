@@ -1,12 +1,13 @@
 // 视图：情景沙盘（Phase 3 迁移 sandbox.js）：模拟 → 对比 → 返回，零前端财富计算。
 // 铁律：本页 100% 消费 POST /api/wealth/scenario/{name}/compare 的返回；
 //       wealth_score / RFR / NWC 等结论全部由后端 apply_scenario → build_overview 重算，前端只做展示与差值着色。
-import { store } from '../store.js';
+import { store, loadActionPlan, adoptAction } from '../store.js';
 import { api, ApiError } from '../api.js';
 import { fmtMoney, LIMITATION_LABELS } from '../format.js';
 import { interpret } from '../lib/scenario-interpret.js';
+import { navigate } from '../router.js';
 
-const { reactive, computed } = Vue;
+const { reactive, computed, ref, onMounted } = Vue;
 
 // 差值着色：dti 下降为优、房产占比中性不着色、其余上升为优。
 const UP_GOOD = new Set(['net_worth', 'wealth_score', 'rfr', 'nwc', 'cashflow', 'liquidity', 'goal_completion']);
@@ -86,6 +87,9 @@ function defaultParams(name) {
 
 export const SandboxView = {
   setup() {
+    // P1 回流：加载既有行动计划，判断哪些模拟方案已加入（避免重复采纳）。
+    onMounted(() => { loadActionPlan().catch(() => {}); });
+
     // 预选场景（来自「下一步」按钮的跨视图信号），只切换场景 + 默认参数，绝不反推金额。
     const preset = store.sandbox.preset;
     store.sandbox.preset = null;
@@ -159,8 +163,10 @@ export const SandboxView = {
     const interpretations = computed(() => {
       const r = st.result;
       if (!r || !r.options) return [];
-      return r.options.map(o => interpret(
-        r.scenario, o, r.baseline, o.overview, (r.comparison && r.comparison[o.id]) || [],
+      // 修复：后端 CompareOptionOverview 不含 params，summary 需要用户输入参数 →
+      // 传客户端 st.options[i]（params 是入参非计算结果），overview 仍用后端返回。
+      return r.options.map((o, i) => interpret(
+        r.scenario, (st.options[i] || o), r.baseline, o.overview, (r.comparison && r.comparison[o.id]) || [],
       ));
     });
 
@@ -179,6 +185,29 @@ export const SandboxView = {
 
     function resetToBaseline() { st.result = null; st.error = null; }
 
+    // —— P1 回流：模拟结论 → 真实决策（加入行动计划 / 问 AI 顾问评估）——
+    // 模拟方案不映射风险问题（issue_id=null），作为独立行动计划项，与 Issues 建议去重互不干扰。
+    const planError = ref(null);
+    const sandboxAdopted = computed(() => {
+      const s = new Set();
+      const plans = (store.actionPlan.data && store.actionPlan.data.plans) || [];
+      for (const p of plans) if (p.status === 'todo') s.add(p.action);
+      return s;
+    });
+    function actionLabel(optId) {
+      return '模拟「' + SCENARIOS[st.scenario].label + '」方案 ' + optId;
+    }
+    async function adoptOption(optId, summary) {
+      planError.value = null;
+      try { await adoptAction({ issue_id: null, action: actionLabel(optId), detail: summary }); }
+      catch (e) { planError.value = e.message || '采纳失败'; }
+    }
+    function askAdvisor(optId, summary) {
+      store.chat.draft = '我模拟了「' + SCENARIOS[st.scenario].label + '」方案 ' + optId
+        + '：' + summary + '。这对我的家庭财务意味着什么？你怎么看？';
+      navigate('chat');
+    }
+
     const limitations = computed(() => {
       const ret = st.result && st.result.baseline && st.result.baseline.retirement;
       return (ret && ret.known_limitations) || [];
@@ -189,6 +218,7 @@ export const SandboxView = {
       store, st, SCENARIOS, SCENARIO_KEYS, pickScenario, addOption, removeOption,
       runCompare, upgrade, rows, fmtValue, fmtDelta, deltaTone, fmtMoney,
       limitations, limitationLabel, interpretations, hasData, allNoDiff, resetToBaseline,
+      planError, sandboxAdopted, actionLabel, adoptOption, askAdvisor,
     };
   },
   template: `
@@ -260,6 +290,8 @@ export const SandboxView = {
         各方案与当前状态差异有限，暂无明显优劣，可调整参数后再看。
       </div>
 
+      <div v-if="planError" class="err-box"><span>{{ planError }}</span></div>
+
       <!-- 决策叙事卡（发生了什么 / 定位 / 风险 / 问题变化，全部只读后端返回） -->
       <div v-if="hasData" class="interp-grid">
         <div v-for="(ip, i) in interpretations" :key="st.result.options[i].id" class="interp-card">
@@ -284,6 +316,13 @@ export const SandboxView = {
               <span class="issue-label">新增风险</span>
               <span v-for="t in ip.issueDelta.added" :key="t" class="issue-chip">{{ t }}</span>
             </div>
+          </div>
+          <!-- P1 回流：看完模拟 → 变成真实决策（加入行动计划 / 问 AI 顾问评估） -->
+          <div v-if="hasData && !allNoDiff" class="interp-actions">
+            <button v-if="!sandboxAdopted.has(actionLabel(st.result.options[i].id))"
+                    class="btn-mini rec-adopt" @click="adoptOption(st.result.options[i].id, ip.summary)">＋ 加入行动计划</button>
+            <span v-else class="rec-adopted">已加入计划</span>
+            <button class="btn-mini" @click="askAdvisor(st.result.options[i].id, ip.summary)">问 AI 顾问评估 →</button>
           </div>
         </div>
       </div>

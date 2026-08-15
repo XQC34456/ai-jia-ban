@@ -29,7 +29,8 @@ export const store = reactive({
   sandbox: { result: null, comparison: null, loading: false, error: null, preset: null },
 
   // —— 切片：AI 顾问对话（Phase 4 迁移 vanilla chat 后启用）——
-  chat: { messages: [], loading: false, error: null },
+  // draft：跨视图「问顾问」一次性预填信号（Goals/Retirement/Sandbox 写入、chat setup 读取后清空），仅前端状态，不落库。
+  chat: { messages: [], loading: false, error: null, draft: null },
 
   // —— 切片：家庭数据（Phase 6A 可编辑闭环：读 /api/family，写 entity CRUD）——
   family: { data: null, loading: false, error: null, saving: false },

@@ -104,6 +104,10 @@ export const ChatView = {
     const sending = ref(false);
     const chatError = ref('');
 
+    // P1 跨视图预填：Goals/Retirement/Sandbox 的「问顾问」写入一次性草稿，落到输入框后立即清空。
+    // 一次性消费——离开聊天页再回来不会残留旧问题。
+    if (store.chat.draft) { input.value = store.chat.draft; store.chat.draft = null; }
+
     // —— 行动计划（P1.4：⑤下一步可采纳，与风险问题页共用 issue_id+action 去重）——
     const planError = ref(null);
     const adoptedSet = computed(() => {

@@ -3,6 +3,7 @@
 import { store, loadGoals } from '../store.js';
 import { fmtMoney, fmtPct } from '../format.js';
 import { GoalProgress } from '../charts.js';
+import { navigate } from '../router.js';
 
 const { onMounted, computed } = Vue;
 
@@ -15,7 +16,15 @@ export const GoalsView = {
 
     const goals = computed(() => (store.goals.data && store.goals.data.goals) || []);
 
-    return { store, goals, fmtMoney, fmtPct, PRIORITY_LABELS };
+    // P1 决策闭环出口：看完目标 → 问顾问怎么办。预填问题只组织后端既有数字，零计算。
+    function askAdvisor(g) {
+      store.chat.draft = '我的目标「' + g.name + '」（' + g.type + '）目标金额 '
+        + fmtMoney(g.target_amount) + '，已备 ' + fmtMoney(g.current_saved) + '，缺口 '
+        + fmtMoney(g.gap) + '，每月需存 ' + fmtMoney(g.monthly_needed) + '，请帮我看看怎么完成最稳。';
+      navigate('chat');
+    }
+
+    return { store, goals, fmtMoney, fmtPct, PRIORITY_LABELS, askAdvisor };
   },
   template: `
     <div class="view">
@@ -49,6 +58,9 @@ export const GoalsView = {
             <div class="kv"><span>目标日期</span><b>{{ g.target_date || '未设期限' }}</b></div>
             <div class="kv"><span>优先级</span><b>{{ PRIORITY_LABELS[g.priority] || '—' }}</b></div>
             <div class="kv"><span>目标类型</span><b>{{ g.goal_kind === 'cashflow' ? '现金流型' : '一次性' }}</b></div>
+          </div>
+          <div class="goal-actions">
+            <button class="btn-mini" @click="askAdvisor(g)">问顾问 · 这个目标怎么完成？</button>
           </div>
         </div>
       </template>
