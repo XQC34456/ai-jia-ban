@@ -575,6 +575,16 @@ button { font-family: inherit; }
 .layer-chart-block { display: flex; flex-direction: column; gap: 6px; }
 .layer-chart-q { font-size: 13px; color: var(--muted); font-weight: 500; }
 
+/* P1.3 结构化追问：系统缺数检测出的问题，点一下回填输入框直接作答 */
+.followup-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.followup-chip {
+  font-size: 13px; padding: 7px 12px; border-radius: 10px; cursor: pointer; text-align: left;
+  background: #eef6ff; color: #1d4ed8; border: 1px solid #cfe2ff; font-family: inherit; line-height: 1.4;
+  transition: border-color .15s ease, background .15s ease;
+}
+.followup-chip:hover { background: #e0efff; border-color: #93c5fd; }
+.followup-chip:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
 .chat-input-row { display: flex; gap: 10px; align-items: flex-end; }
 .chat-input {
   flex: 1; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px;

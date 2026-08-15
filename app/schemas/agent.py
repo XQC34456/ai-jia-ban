@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, model_validator
 __all__ = [
     "AGENT_INTENTS", "INTENT_TO_ENDPOINT", "INTENT_SUBFIELD", "SCENARIO_ALIASES",
     "MetricRef", "PriorityRef", "EvidenceRef", "TradeoffRef", "UncertaintyRef",
-    "ChartBlock", "AdvisorLayers",
+    "FollowUpRef", "ChartBlock", "AdvisorLayers",
     "AgentResponse", "AgentRequest",
 ]
 
@@ -105,6 +105,12 @@ class UncertaintyRef(BaseModel):
     alternatives: list[str] = Field(default_factory=list)   # 备选解释
 
 
+class FollowUpRef(BaseModel):
+    """结构化追问：系统检测到的信息缺口（question 是要问用户的问题，reason 是为什么缺）。"""
+    question: str
+    reason: str
+
+
 # ---------- V2.6 五层结构化回答契约：系统层 vs LLM 叙事层分离 ----------
 
 class ChartBlock(BaseModel):
@@ -145,6 +151,8 @@ class AgentResponse(BaseModel):
     # ---- P1.2 新增：情景对比原始 comparison（{"A": [9行 baseline/option/delta], ...}），
     #      供 layers 生成 scenario_compare 证据图；缺省 None（非情景意图 / 无对比）。 ----
     scenario_comparison: dict | None = None
+    # ---- P1.3 新增：结构化追问（系统缺数检测，非 LLM 编造）。缺省空列表。 ----
+    follow_up_questions: list[FollowUpRef] = Field(default_factory=list)
 
 
 class AgentRequest(BaseModel):

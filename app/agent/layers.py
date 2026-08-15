@@ -11,8 +11,9 @@
 from __future__ import annotations
 
 from .. import db
-from ..schemas.agent import AdvisorLayers, AgentResponse, ChartBlock
+from ..schemas.agent import AdvisorLayers, AgentResponse, ChartBlock, FollowUpRef
 from ..services import build_overview
+from .followup import follow_up_questions
 from .memory import INVALIDATION_LABELS
 
 __all__ = ["attach_layers"]
@@ -160,7 +161,8 @@ def attach_layers(resp: AgentResponse, family_id: int,
         return resp
     if resp.status != "ok":
         return resp   # 澄清/拒绝/错误 → 旧扁平渲染，不套五层
-    overview = build_overview(db.dump_family(family_id))
+    data = db.dump_family(family_id)
+    overview = build_overview(data)
     # 情景对比走专用证据图（baseline vs 方案分组条形图），不再用 overview 画像块。
     if resp.intent == "SCENARIO_COMPARE" and resp.scenario_comparison:
         scenario_chart = _build_scenario_chart(resp.scenario_comparison)
@@ -174,4 +176,6 @@ def attach_layers(resp: AgentResponse, family_id: int,
         judgment=resp.finding,
         action_plan=_build_action_plan(overview),
     )
-    return resp.model_copy(update={"layers": layers})
+    # ⑥ 结构化追问：系统缺数检测（deterministic），与五层同源、同幂等。
+    follow_ups = [FollowUpRef(**f) for f in follow_up_questions(resp.intent, data)]
+    return resp.model_copy(update={"layers": layers, "follow_up_questions": follow_ups})

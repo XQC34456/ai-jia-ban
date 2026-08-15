@@ -100,6 +100,7 @@ const SCENARIO_KEYS = Object.keys(DECISION_SCENARIOS);
 export const ChatView = {
   setup() {
     const input = ref('');
+    const chatInputEl = ref(null);
     const sending = ref(false);
     const chatError = ref('');
 
@@ -173,6 +174,12 @@ export const ChatView = {
 
     function onKey(e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    }
+
+    // —— 结构化追问（P1.3）：系统缺数检测出的问题 → 点一下回填输入框，直接作答 ——
+    function fillInput(q) {
+      input.value = q;
+      nextTick(() => { if (chatInputEl.value) chatInputEl.value.focus(); });
     }
 
     // —— 决策 ——
@@ -340,7 +347,7 @@ export const ChatView = {
     }
 
     return {
-      store, input, sending, chatError, send, confirm, onKey,
+      store, input, sending, chatError, send, confirm, onKey, fillInput,
       DECISION_SCENARIOS, SCENARIO_KEYS,
       decisionOpen, decisionScenario, decisionParams, decisionResult, decisionBusy, decisionError,
       openDecision, pickDecisionScenario, runDecision, doUpgrade,
@@ -432,6 +439,16 @@ export const ChatView = {
                 <span v-for="(a, i) in m.agent.layers.action_plan" :key="i" class="chip">{{ a }}</span>
               </div>
             </div>
+
+            <div v-if="m.agent.follow_up_questions && m.agent.follow_up_questions.length" class="layer-block">
+              <div class="layer-step">⑥ 还差这些信息</div>
+              <div class="followup-list">
+                <button v-for="(f, i) in m.agent.follow_up_questions" :key="i"
+                  class="followup-chip" :title="f.reason" @click="fillInput(f.question)">
+                  {{ f.question }}
+                </button>
+              </div>
+            </div>
           </template>
 
           <!-- 旧扁平渲染兜底（无 layers：澄清/拒绝/错误，或旧缓存） -->
@@ -458,7 +475,7 @@ export const ChatView = {
     </div>
 
     <div class="chat-input-row">
-      <textarea v-model="input" class="chat-input" rows="2"
+      <textarea ref="chatInputEl" v-model="input" class="chat-input" rows="2"
         placeholder="输入家庭情况或问题…（Enter 发送，Shift+Enter 换行）" @keydown="onKey"></textarea>
       <button class="btn-primary" :disabled="sending || !input.trim()" @click="send">发送</button>
     </div>
