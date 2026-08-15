@@ -1,0 +1,310 @@
+[
+ {
+  "id": 1,
+  "family": "empty",
+  "turns": [
+   {
+    "returned": "AgentResponse",
+    "intent": "SCENARIO_COMPARE",
+    "status": "need_clarification",
+    "metric_keys": [],
+    "key_numbers": [],
+    "evidence_paths": [],
+    "has_next_actions": false,
+    "priorities": [],
+    "iron_ok": true,
+    "cancel_type": null
+   }
+  ]
+ },
+ {
+  "id": "1b",
+  "family": "filed",
+  "turns": [
+   {
+    "returned": "AgentResponse",
+    "intent": "SCENARIO_COMPARE",
+    "status": "need_clarification",
+    "metric_keys": [],
+    "key_numbers": [],
+    "evidence_paths": [],
+    "has_next_actions": false,
+    "priorities": [],
+    "iron_ok": true,
+    "cancel_type": null
+   }
+  ]
+ },
+ {
+  "id": 2,
+  "family": "filed",
+  "turns": [
+   {
+    "returned": "AgentResponse",
+    "intent": "EXPLAIN_RESULT",
+    "status": "need_clarification",
+    "metric_keys": [],
+    "key_numbers": [],
+    "evidence_paths": [],
+    "has_next_actions": false,
+    "priorities": [],
+    "iron_ok": true,
+    "cancel_type": null
+   }
+  ]
+ },
+ {
+  "id": 3,
+  "family": "filed",
+  "turns": [
+   {
+    "returned": "AgentResponse",
+    "intent": "SCENARIO_COMPARE",
+    "status": "need_clarification",
+    "metric_keys": [],
+    "key_numbers": [],
+    "evidence_paths": [],
+    "has_next_actions": false,
+    "priorities": [],
+    "iron_ok": true,
+    "cancel_type": null
+   }
+  ]
+ },
+ {
+  "id": 4,
+  "family": "filed",
+  "turns": [
+   {
+    "returned": "AgentResponse",
+    "intent": "SCENARIO_COMPARE",
+    "status": "need_clarification",
+    "metric_keys": [],
+    "key_numbers": [],
+    "evidence_paths": [],
+    "has_next_actions": false,
+    "priorities": [],
+    "iron_ok": false,
+    "cancel_type": null
+   }
+  ]
+ },
+ {
+  "id": 5,
+  "family": "filed",
+  "turns": [
+   {
+    "returned": "AgentResponse",
+    "intent": "CHECK_GOALS",
+    "status": "ok",
+    "metric_keys": [
+     "goal_1_coverage",
+     "goal_1_gap"
+    ],
+    "key_numbers": [
+     "goal_1_coverage=0.1@goals.1.coverage",
+     "goal_1_gap=900000.0@goals.1.gap"
+    ],
+    "evidence_paths": [],
+    "has_next_actions": false,
+    "priorities": [],
+    "iron_ok": false,
+    "cancel_type": null
+   }
+  ]
+ },
+ {
+  "id": 6,
+  "family": "filed",
+  "turns": [
+   {
+    "returned": "AgentResponse",
+    "intent": "CHECK_RETIREMENT",
+    "status": "ok",
+    "metric_keys": [
+     "nwc",
+     "rfr"
+    ],
+    "key_numbers": [
+     "nwc=1.24@overview.retirement.nwc",
+     "rfr=1.24@overview.retirement.rfr"
+    ],
+    "evidence_paths": [],
+    "has_next_actions": false,
+    "priorities": [],
+    "iron_ok": true,
+    "cancel_type": null
+   }
+  ]
+ },
+ {
+  "id": 7,
+  "family": "filed",
+  "turns": [
+   {
+    "returned": "AgentResponse",
+    "intent": "VIEW_OVERVIEW",
+    "status": "ok",
+    "metric_keys": [
+     "cashflow_surplus",
+     "dti",
+     "liquidity_months",
+     "net_worth",
+     "wealth_score"
+    ],
+    "key_numbers": [
+     "cashflow_surplus=10000.0@overview.cashflow.surplus",
+     "dti=0.3@overview.debt.dti",
+     "liquidity_months=16.7@overview.liquidity.emergency_months",
+     "net_worth=-1200000.0@overview.net_worth",
+     "wealth_score=78.0@overview.wealth_score"
+    ],
+    "evidence_paths": [],
+    "has_next_actions": false,
+    "priorities": [],
+    "iron_ok": true,
+    "cancel_type": null
+   }
+  ]
+ },
+ {
+  "id": 8,
+  "family": "empty",
+  "turns": [
+   {
+    "returned": "AgentResponse",
+    "intent": "VIEW_OVERVIEW",
+    "status": "ok",
+    "metric_keys": [
+     "cashflow_surplus",
+     "net_worth",
+     "wealth_score"
+    ],
+    "key_numbers": [
+     "cashflow_surplus=0.0@overview.cashflow.surplus",
+     "net_worth=0.0@overview.net_worth",
+     "wealth_score=46.0@overview.wealth_score"
+    ],
+    "evidence_paths": [],
+    "has_next_actions": false,
+    "priorities": [],
+    "iron_ok": true,
+    "cancel_type": null
+   }
+  ]
+ },
+ {
+  "id": 9,
+  "family": "filed",
+  "turns": [
+   {
+    "returned": "AgentResponse",
+    "intent": "SCENARIO_COMPARE",
+    "status": "need_clarification",
+    "metric_keys": [],
+    "key_numbers": [],
+    "evidence_paths": [],
+    "has_next_actions": false,
+    "priorities": [],
+    "iron_ok": true,
+    "cancel_type": null
+   }
+  ]
+ },
+ {
+  "id": 10,
+  "family": "empty",
+  "turns": [
+   {
+    "returned": "AgentResponse",
+    "intent": "EXPLAIN_RESULT",
+    "status": "need_clarification",
+    "metric_keys": [],
+    "key_numbers": [],
+    "evidence_paths": [],
+    "has_next_actions": false,
+    "priorities": [],
+    "iron_ok": true,
+    "cancel_type": null
+   },
+   {
+    "returned": "AgentResponse",
+    "intent": "CHECK_ISSUES",
+    "status": "ok",
+    "metric_keys": [],
+    "key_numbers": [],
+    "evidence_paths": [],
+    "has_next_actions": false,
+    "priorities": [],
+    "iron_ok": true,
+    "cancel_type": null
+   }
+  ]
+ },
+ {
+  "id": 11,
+  "family": "filed",
+  "turns": [
+   {
+    "returned": "AgentResponse",
+    "intent": "VIEW_OVERVIEW",
+    "status": "ok",
+    "metric_keys": [
+     "cashflow_surplus",
+     "dti",
+     "liquidity_months",
+     "net_worth",
+     "wealth_score"
+    ],
+    "key_numbers": [
+     "cashflow_surplus=10000.0@overview.cashflow.surplus",
+     "dti=0.3@overview.debt.dti",
+     "liquidity_months=16.7@overview.liquidity.emergency_months",
+     "net_worth=-1200000.0@overview.net_worth",
+     "wealth_score=78.0@overview.wealth_score"
+    ],
+    "evidence_paths": [],
+    "has_next_actions": false,
+    "priorities": [],
+    "iron_ok": true,
+    "cancel_type": null
+   },
+   {
+    "returned": "AgentResponse",
+    "intent": "EXPLAIN_RESULT",
+    "status": "need_clarification",
+    "metric_keys": [],
+    "key_numbers": [],
+    "evidence_paths": [],
+    "has_next_actions": false,
+    "priorities": [],
+    "iron_ok": true,
+    "cancel_type": null
+   }
+  ]
+ },
+ {
+  "id": 12,
+  "family": "filed",
+  "turns": [
+   {
+    "returned": "AgentResponse",
+    "intent": "CHECK_GOALS",
+    "status": "ok",
+    "metric_keys": [
+     "goal_1_coverage",
+     "goal_1_gap"
+    ],
+    "key_numbers": [
+     "goal_1_coverage=0.1@goals.1.coverage",
+     "goal_1_gap=900000.0@goals.1.gap"
+    ],
+    "evidence_paths": [],
+    "has_next_actions": false,
+    "priorities": [],
+    "iron_ok": false,
+    "cancel_type": null
+   }
+  ]
+ }
+]
