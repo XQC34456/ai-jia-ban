@@ -42,6 +42,7 @@ def build_overview(family_data: dict) -> dict:
         "currency": "CNY",
         "wealth_score": ws["score"],
         "wealth_level": ws["level"],
+        "dimensions": ws["dimensions"],
         "net_worth": snap["net_worth"],
         "total_assets": snap["total_assets"],
         "total_liabilities": snap["total_liabilities"],

@@ -152,6 +152,9 @@ def migrate() -> None:
         if version < 5:
             _migrate_v5(conn)
             version = 5
+        if version < 6:
+            _migrate_v6(conn)
+            version = 6
         conn.execute(
             "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
             (str(version),),
@@ -308,6 +311,26 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
             date TEXT NOT NULL,
             count INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
+
+
+def _migrate_v6(conn: sqlite3.Connection) -> None:
+    """主链收口：新增行动计划表（采纳的财富建议 + 完成状态）。
+
+    只存「建议文本 + 状态」，不参与财富计算；数字仍由 Decision Layer 生成。
+    """
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS action_plan (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            family_id INTEGER NOT NULL,
+            issue_id TEXT,
+            action TEXT NOT NULL,
+            detail TEXT,
+            status TEXT NOT NULL DEFAULT 'todo',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(family_id) REFERENCES family(id)
         )
     """)
 
@@ -546,6 +569,22 @@ def invalidate_judgment(judgment_id: int) -> None:
 
 # ---------- 对话抽取动作的落地 ----------
 
+def _asset_exists(family_id: int, type_: str, name: str, value: float) -> bool:
+    """对话建档去重：同家庭已存在相同资产（type+name+value）则不重复插入。"""
+    return bool(_rows(
+        "SELECT 1 FROM asset WHERE family_id=? AND type=? AND name=? AND value=?",
+        (family_id, type_, name, value),
+    ))
+
+
+def _cashflow_exists(family_id: int, flow_type: str, category: str, amount: float, period: str) -> bool:
+    """对话建档去重：同家庭已存在相同现金流（类型+类别+金额+周期）则不重复插入。"""
+    return bool(_rows(
+        "SELECT 1 FROM cashflow WHERE family_id=? AND flow_type=? AND category=? AND amount=? AND period=?",
+        (family_id, flow_type, category, amount, period),
+    ))
+
+
 def apply_action(family_id: int, action: dict[str, Any]) -> None:
     """把一个建档动作写入数据库。action 由 extraction 层产出。"""
     kind = action["kind"]
@@ -565,30 +604,39 @@ def apply_action(family_id: int, action: dict[str, Any]) -> None:
             "job": f.get("job"),
         })
     elif kind == "income":
+        _cat, _amt, _per = f.get("category", "工资"), f.get("amount", 0), f.get("period", "月")
+        if _cashflow_exists(family_id, "income", _cat, _amt, _per):
+            return
         _insert("cashflow", {
             "family_id": family_id,
             "person_id": person_id,
             "flow_type": "income",
-            "category": f.get("category", "工资"),
-            "amount": f.get("amount", 0),
-            "period": f.get("period", "月"),
+            "category": _cat,
+            "amount": _amt,
+            "period": _per,
         })
     elif kind == "expense":
+        _cat, _amt, _per = f.get("category", "其他"), f.get("amount", 0), f.get("period", "月")
+        if _cashflow_exists(family_id, "expense", _cat, _amt, _per):
+            return
         _insert("cashflow", {
             "family_id": family_id,
             "person_id": person_id,
             "flow_type": "expense",
-            "category": f.get("category", "其他"),
-            "amount": f.get("amount", 0),
-            "period": f.get("period", "月"),
+            "category": _cat,
+            "amount": _amt,
+            "period": _per,
         })
     elif kind == "asset":
+        _type, _name, _val = f.get("type", "其他"), f.get("name", ""), f.get("value", 0)
+        if _asset_exists(family_id, _type, _name, _val):
+            return
         _insert("asset", {
             "family_id": family_id,
             "person_id": person_id,
-            "type": f.get("type", "其他"),
-            "name": f.get("name", ""),
-            "value": f.get("value", 0),
+            "type": _type,
+            "name": _name,
+            "value": _val,
         })
     elif kind == "liability":
         _insert("liability", {
@@ -613,6 +661,49 @@ def apply_action(family_id: int, action: dict[str, Any]) -> None:
         })
     else:
         raise ValueError(f"未知动作类型: {kind}")
+
+
+# ---------- 行动计划（采纳建议 → 可跟踪，主链收口） ----------
+
+def create_action_plan(family_id: int, issue_id: str | None, action: str,
+                       detail: str | None) -> int | None:
+    """采纳一条建议进入行动计划；同 family+issue_id+action 且未完成 → 去重，返回 None。"""
+    iid = issue_id or ""
+    if _rows(
+        "SELECT 1 FROM action_plan WHERE family_id=? AND issue_id=? AND action=? AND status='todo'",
+        (family_id, iid, action),
+    ):
+        return None
+    return _insert("action_plan", {
+        "family_id": family_id,
+        "issue_id": iid,
+        "action": action,
+        "detail": detail,
+        "status": "todo",
+        "created_at": _now(),
+        "updated_at": _now(),
+    })
+
+
+def list_action_plan(family_id: int) -> list[dict]:
+    """按 id 正序返回该家庭全部行动计划（含已完成/已跳过）。"""
+    return _rows(
+        "SELECT * FROM action_plan WHERE family_id=? ORDER BY id ASC",
+        (family_id,),
+    )
+
+
+def update_action_plan_status(plan_id: int, status: str) -> None:
+    """更新行动计划状态（todo/done/skipped）。"""
+    conn = get_conn()
+    try:
+        conn.execute(
+            "UPDATE action_plan SET status=?, updated_at=? WHERE id=?",
+            (status, _now(), plan_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # ---------- 看板直接编辑的通用 CRUD ----------

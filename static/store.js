@@ -33,6 +33,12 @@ export const store = reactive({
 
   // —— 切片：家庭数据（Phase 6A 可编辑闭环：读 /api/family，写 entity CRUD）——
   family: { data: null, loading: false, error: null, saving: false },
+
+  // —— 切片：动态重评估状态（上次判断是否已失效 + 失效维度）——
+  review: { data: null, loading: false, error: null },
+
+  // —— 切片：行动计划（采纳的财富建议 + 完成状态）——
+  actionPlan: { data: null, loading: false, error: null },
 });
 
 function applySession(r) {
@@ -65,6 +71,8 @@ export function logout() {
   store.sandbox.comparison = null;
   store.chat.messages = [];
   store.family.data = null;
+  store.review.data = null;
+  store.actionPlan.data = null;
   store.onboarded = false;
   localStorage.removeItem('token');
   localStorage.removeItem('onboarded');
@@ -124,6 +132,43 @@ export async function loadIssues() {
   } finally {
     store.issues.loading = false;
   }
+}
+
+export async function loadReview() {
+  store.review.loading = true;
+  store.review.error = null;
+  try {
+    store.review.data = await api('/api/wealth/review-status', { token: store.auth.token });
+  } catch (e) {
+    store.review.error = e.message;
+    throw e;
+  } finally {
+    store.review.loading = false;
+  }
+}
+
+export async function loadActionPlan() {
+  store.actionPlan.loading = true;
+  store.actionPlan.error = null;
+  try {
+    store.actionPlan.data = await api('/api/wealth/action-plan', { token: store.auth.token });
+  } catch (e) {
+    store.actionPlan.error = e.message;
+    throw e;
+  } finally {
+    store.actionPlan.loading = false;
+  }
+}
+
+export async function adoptAction(payload) {
+  const r = await api('/api/wealth/action-plan', { method: 'POST', body: payload, token: store.auth.token });
+  await loadActionPlan();
+  return r;
+}
+
+export async function setActionStatus(id, status) {
+  await api(`/api/wealth/action-plan/${id}`, { method: 'PUT', body: { status }, token: store.auth.token });
+  await loadActionPlan();
 }
 
 export async function loadFamily() {

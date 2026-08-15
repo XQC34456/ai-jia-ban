@@ -8,6 +8,7 @@ from __future__ import annotations
 from .. import db
 from ..schemas.agent import AgentResponse, ConfirmCard
 from .context import build_wealth_context, context_to_text
+from .layers import attach_layers
 from .memory import build_memory_context, detect_invalidation, record_turn
 from .profile import create_confirm, extract_actions
 from .provider import LLMProvider
@@ -30,6 +31,8 @@ def converse(message: str, user: dict, llm: LLMProvider | None = None,
     memory_context = build_memory_context(user["family_id"], invalidation=invalidation)
     result = handle(message, user, llm=llm, context=context, wealth_context=wealth_context,
                     memory_context=memory_context)
+    if isinstance(result, AgentResponse):
+        result = attach_layers(result, user["family_id"], invalidation)
     record_turn(user["family_id"], message, result)
     return result
 

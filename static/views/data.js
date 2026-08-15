@@ -27,7 +27,7 @@ const SECTIONS = [
   {
     key: 'income', label: '收入', table: 'cashflow', flowType: 'income',
     fields: [
-      { key: 'category', label: '收入来源', type: 'text', def: '工资' },
+      { key: 'category', label: '收入来源', type: 'select', options: ['工资', '租金收入', '理财收益', '经营收入', '其他'], def: '工资' },
       { key: 'amount', label: '金额（元）', type: 'number', required: true },
       { key: 'period', label: '周期', type: 'select', options: ['月', '年'], def: '月' },
     ],
@@ -40,7 +40,7 @@ const SECTIONS = [
   {
     key: 'expense', label: '支出', table: 'cashflow', flowType: 'expense',
     fields: [
-      { key: 'category', label: '支出类别', type: 'text', def: '其他' },
+      { key: 'category', label: '支出类别', type: 'select', options: ['日常开销', '居住', '教育', '医疗', '其他'], def: '其他' },
       { key: 'amount', label: '金额（元）', type: 'number', required: true },
       { key: 'period', label: '周期', type: 'select', options: ['月', '年'], def: '月' },
     ],
@@ -54,7 +54,7 @@ const SECTIONS = [
     key: 'asset', label: '资产', table: 'asset',
     fields: [
       { key: 'type', label: '资产类型', type: 'select', options: ['房产', '存款', '基金', '股票', '理财', '保险现金价值', '其他'], def: '其他' },
-      { key: 'name', label: '资产名称', type: 'text' },
+      { key: 'name', label: '资产名称（留空自动=类型）', type: 'text' },
       { key: 'value', label: '金额（元）', type: 'number', required: true },
     ],
     columns: [
@@ -88,7 +88,7 @@ const SECTIONS = [
       { key: 'type', label: '目标类型', type: 'select', options: ['教育', '养老', '买房', '创业', '其他'], def: '教育' },
       { key: 'name', label: '目标名称', type: 'text', required: true },
       { key: 'target_amount', label: '目标金额（元）', type: 'number' },
-      { key: 'target_date', label: '目标日期', type: 'text' },
+      { key: 'target_date', label: '目标日期', type: 'date' },
       { key: 'current_saved', label: '已备资金（元）', type: 'number' },
       { key: 'monthly_contribution', label: '每月定投（元）', type: 'number' },
     ],
@@ -120,6 +120,18 @@ function fmtCell(col, v) {
   return v;
 }
 
+// 把历史脏日期（2036.9.13 / 2036 / 2036-9-13）归一化成 date input 能识别的 YYYY-MM-DD。
+function toDateInput(v) {
+  if (!v) return '';
+  const t = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const m = t.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  const y = t.match(/^(\d{4})$/);
+  if (y) return `${y[1]}-01-01`;
+  return t;
+}
+
 export const DataView = {
   setup() {
     const st = reactive({
@@ -148,7 +160,11 @@ export const DataView = {
     }
     function openEdit(row) {
       const p = {};
-      for (const f of active.value.fields) p[f.key] = row[f.key] != null ? row[f.key] : '';
+      for (const f of active.value.fields) {
+        let v = row[f.key] != null ? row[f.key] : '';
+        if (f.type === 'date') v = toDateInput(v);
+        p[f.key] = v;
+      }
       st.form = p;
       st.editing = { mode: 'edit', id: row.id };
       st.error = null;
@@ -165,7 +181,17 @@ export const DataView = {
         payload[f.key] = v;
       }
       if (sec.flowType) payload.flow_type = sec.flowType;
+      // 资产名称兜底：为空时用资产类型自动填充，消灭空 name
+      if (sec.key === 'asset' && !payload.name && payload.type) payload.name = payload.type;
       return payload;
+    }
+
+    // select 选项：预设项 + 当前值兜底（历史自由文本如「固定开支」也能正常显示）
+    function optsFor(f) {
+      const opts = f.options ? [...f.options] : [];
+      const cur = st.form[f.key];
+      if (cur != null && cur !== '' && !opts.includes(cur)) opts.push(cur);
+      return opts;
     }
 
     function validate() {
@@ -209,7 +235,7 @@ export const DataView = {
 
     return {
       store, st, SECTIONS, active, rows, fmtCell,
-      openCreate, openEdit, closeModal, save, remove,
+      openCreate, openEdit, closeModal, save, remove, optsFor,
     };
   },
   template: `
@@ -273,8 +299,9 @@ export const DataView = {
               <span class="f-label">{{ f.label }}{{ f.required ? ' *' : '' }}</span>
               <input v-if="f.type === 'text'" v-model="st.form[f.key]" />
               <input v-else-if="f.type === 'number'" type="number" step="any" v-model.number="st.form[f.key]" />
+              <input v-else-if="f.type === 'date'" type="date" v-model="st.form[f.key]" />
               <select v-else-if="f.type === 'select'" v-model="st.form[f.key]">
-                <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
+                <option v-for="o in optsFor(f)" :key="o" :value="o">{{ o }}</option>
               </select>
             </label>
           </div>

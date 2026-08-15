@@ -82,6 +82,30 @@ def test_goal_monthly_needed_with_date():
     assert gap["monthly_needed"] == 9900.99
 
 
+def test_parse_date_tolerates_dirty_formats():
+    from datetime import date
+    assert ce._parse_date("2036-09-13") == date(2036, 9, 13)
+    assert ce._parse_date("2036.9.13") == date(2036, 9, 13)
+    assert ce._parse_date("2036/9/13") == date(2036, 9, 13)
+    assert ce._parse_date("2036-9-13") == date(2036, 9, 13)
+    assert ce._parse_date("2036") == date(2036, 1, 1)
+    assert ce._parse_date("2036-09") == date(2036, 9, 1)
+    assert ce._parse_date("") is None
+    assert ce._parse_date(None) is None
+    assert ce._parse_date("乱填") is None
+
+
+def test_goal_monthly_needed_with_dirty_date():
+    """历史脏日期（如 2036.9.13）也能正确算出月数与每月需存，不再静默失效。"""
+    from datetime import date
+    today = date(2026, 8, 13)
+    goal = {"name": "教育", "target_amount": 1000000, "current_saved": 0,
+            "target_date": "2036.9.13"}
+    gap = ce.goal_gap(goal, today=today)
+    assert gap["months_remaining"] == 121
+    assert gap["monthly_needed"] is not None
+
+
 def test_goals_funding_feasible():
     from datetime import date
     today = date(2026, 8, 13)

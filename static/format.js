@@ -46,3 +46,10 @@ export const LEVEL_CONCLUSION = {
   需关注: '你的家庭财务有几个需要关注的地方。',
   脆弱: '你的家庭财务比较脆弱，建议尽快调整。',
 };
+
+// 风险维度（与 Decision Layer detect.py 的 7 个 issue type 对齐）：风险地图分组用。
+export const ISSUE_DIM_ORDER = ['cashflow', 'liquidity', 'debt', 'allocation', 'retirement', 'goals', 'decision'];
+export const ISSUE_DIM_LABELS = {
+  cashflow: '现金流', liquidity: '流动性', debt: '负债',
+  allocation: '资产配置', retirement: '养老', goals: '目标', decision: '闲置资金',
+};

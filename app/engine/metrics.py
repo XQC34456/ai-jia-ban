@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 from typing import Any
 
@@ -93,13 +94,39 @@ def debt_to_income(liabilities: list[dict[str, Any]], cashflows: list[dict[str, 
 
 # ---------- 目标 ----------
 
+def _parse_date(s: str | None) -> date | None:
+    """容错解析日期字符串，支持 YYYY-MM-DD / YYYY-MM / YYYY / YYYY.M.D / YYYY/M/D。
+
+    前端日期选择器已保证标准格式，此函数兜底历史脏数据（如「2036.9.13」「2036」），
+    让目标「每月需存」不再因日期格式而静默失效。无法识别返回 None。纯函数、确定性。
+    """
+    if not s:
+        return None
+    t = str(s).strip()
+    try:
+        return datetime.fromisoformat(t).date()
+    except ValueError:
+        pass
+    t = re.sub(r"[./]", "-", t)
+    parts = [p for p in t.split("-") if p != ""]
+    try:
+        if len(parts) == 3:
+            return date(int(parts[0]), int(parts[1]), int(parts[2]))
+        if len(parts) == 2:
+            return date(int(parts[0]), int(parts[1]), 1)
+        if len(parts) == 1:
+            return date(int(parts[0]), 1, 1)
+    except (ValueError, TypeError):
+        return None
+    return None
+
+
 def _months_until(target_date: str | None, today: date | None = None) -> int | None:
     """目标日期距今天还有多少个月（向下取整）。无日期或已过期返回 None/0。"""
     if not target_date:
         return None
-    try:
-        d = datetime.fromisoformat(str(target_date)).date()
-    except ValueError:
+    d = _parse_date(target_date)
+    if d is None:
         return None
     today = today or date.today()
     return max((d.year - today.year) * 12 + (d.month - today.month), 0)

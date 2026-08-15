@@ -2,12 +2,13 @@
 // 只读 store.overview 的 retirement 区块，零计算。
 import { store, ensureOverview } from '../store.js';
 import { RetirementCard } from './cards.js';
+import { RetirementGap } from '../charts.js';
 import { LIMITATION_LABELS } from '../format.js';
 
 const { onMounted, computed } = Vue;
 
 export const RetirementView = {
-  components: { RetirementCard },
+  components: { RetirementCard, RetirementGap },
   setup() {
     onMounted(() => { ensureOverview().catch(() => {}); });
 
@@ -24,6 +25,10 @@ export const RetirementView = {
       <div v-if="store.loading" class="state-hint">加载中…</div>
       <div v-else-if="store.error" class="state-hint error">{{ store.error }}</div>
       <template v-else-if="store.overview">
+        <section class="panel">
+          <div class="card-title">退休缺口 · 资产能否覆盖退休需求？</div>
+          <retirement-gap :data="store.overview.retirement" />
+        </section>
         <retirement-card :o="store.overview" />
         <div v-if="limitations.length" class="card">
           <div class="card-title">模型能力边界</div>

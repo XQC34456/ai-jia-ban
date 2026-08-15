@@ -55,6 +55,7 @@ class Overview(BaseModel):
     currency: str = "CNY"             # 货币单位：所有金额字段均为人民币（元）
     wealth_score: int = 0
     wealth_level: str = "脆弱"
+    dimensions: list[dict] = Field(default_factory=list)   # 7 维健康评分（含 protection），Task 1.1 暴露
     net_worth: float = 0.0
     total_assets: float = 0.0
     total_liabilities: float = 0.0

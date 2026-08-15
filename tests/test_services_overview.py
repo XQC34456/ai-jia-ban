@@ -29,6 +29,19 @@ def test_overview_has_core_keys():
     assert 0 <= o["wealth_score"] <= 100
 
 
+def test_overview_exposes_health_dimensions():
+    """overview 暴露 Engine 已算好的 7 维健康评分（含保障 protection），供前端雷达图。"""
+    o = build_overview(_fd())
+    dims = o["dimensions"]
+    names = [d["name"] for d in dims]
+    assert set(names) == {"cashflow", "liquidity", "debt", "protection",
+                          "allocation", "goals", "retirement"}
+    for d in dims:
+        assert 0 <= d["score"] <= 100
+        assert isinstance(d["reasons"], list)
+        assert isinstance(d["weight"], (int, float))
+
+
 def test_overview_net_worth_consistency():
     o = build_overview(_fd(assets=[{"type": "房产", "value": 3000000}, {"type": "存款", "value": 500000}],
                            liabilities=[{"type": "房贷", "principal": 800000, "monthly_payment": 5000,

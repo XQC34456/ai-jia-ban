@@ -5,9 +5,44 @@
 //   - 建档落地（type=applied）后只「失效缓存」，由其它视图按需重拉（确保财富结论始终来自后端）。
 import { store, upgrade } from '../store.js';
 import { api, ApiError } from '../api.js';
-import { fmtMoney } from '../format.js';
+import { fmtMoney, fmtPct, fmtRatio } from '../format.js';
+import { HealthRadar, CashflowChart, AllocationDonut, DebtGauge, ProtectionGap, GoalProgress, RetirementGap } from '../charts.js';
 
 const { reactive, ref, computed, nextTick } = Vue;
+
+// ---------- 五层回答：图表组件名 → charts.js 组件（只读 props.data，零计算） ----------
+const CHART_COMPONENTS = {
+  radar: HealthRadar,
+  cashflow: CashflowChart,
+  allocation: AllocationDonut,
+  debt: DebtGauge,
+  protection: ProtectionGap,
+  goals: GoalProgress,
+  retirement: RetirementGap,
+};
+function chartComponent(name) { return CHART_COMPONENTS[name] || null; }
+
+// 关键变化值格式化（口径与 overview.js 的 INVAL_UNIT 对齐）
+const INVAL_UNIT = {
+  cashflow_surplus: 'money', total_coverage: 'money',
+  dti: 'pct', real_estate_pct: 'pct',
+  rfr: 'ratio', liquidity_months: 'months', insurance_count: 'count',
+};
+function fmtChangeVal(r) {
+  const kind = INVAL_UNIT[r.key];
+  const f = (v) => {
+    if (v == null) return '—';
+    switch (kind) {
+      case 'money': return fmtMoney(v);
+      case 'pct': return fmtPct(v);
+      case 'ratio': return fmtRatio(v);
+      case 'months': return v + ' 个月';
+      case 'count': return v + ' 份';
+      default: return String(v);
+    }
+  };
+  return f(r.before) + ' → ' + f(r.after);
+}
 
 // ---------- 深度报告：markdown → HTML（先转义，再套用 ## / - / ** 三种轻量标记） ----------
 function escapeHtml(s) {
@@ -241,6 +276,7 @@ export const ChatView = {
       reportOpen, report, reportBusy, reportError, openReport, loadReport,
       reportAdvice, reportMembers, reportAllocation, reportGoals, reportProblems,
       fmtMoney, fmtVal, fmtMetric, summaryLabel, printReport,
+      chartComponent, fmtChangeVal,
     };
   },
   template: `
@@ -284,20 +320,60 @@ export const ChatView = {
           </div>
         </div>
         <div v-else-if="m.agent" class="chat-agent">
-          <div class="agent-intent">{{ m.agent.summary }}</div>
-          <div v-if="m.agent.finding" class="agent-finding">{{ m.agent.finding }}</div>
-          <ul v-if="m.agent.metrics && m.agent.metrics.length" class="agent-metrics">
-            <li v-for="(x, i) in m.agent.metrics" :key="i">
-              <b>{{ x.label }}</b> {{ fmtMetric(x) }}
-              <span class="src" :title="x.source">{{ x.source }}</span>
-            </li>
-          </ul>
-          <ul v-if="m.agent.recommendations && m.agent.recommendations.length" class="agent-recs">
-            <li v-for="(r, i) in m.agent.recommendations" :key="i">{{ r }}</li>
-          </ul>
-          <div v-if="m.agent.next_actions && m.agent.next_actions.length" class="agent-next">
-            <span v-for="(a, i) in m.agent.next_actions" :key="i" class="chip">{{ a }}</span>
-          </div>
+          <!-- V2.6 五层回答：①结论→②关键变化→③财务画像→④我的判断→⑤下一步 -->
+          <template v-if="m.agent.layers">
+            <div v-if="m.agent.layers.conclusion" class="layer-conclusion">
+              <span class="layer-step">① 结论</span>
+              <div class="layer-conclusion-text">{{ m.agent.layers.conclusion }}</div>
+            </div>
+
+            <div v-if="m.agent.layers.changes && m.agent.layers.changes.length" class="layer-block">
+              <div class="layer-step">② 关键变化</div>
+              <div class="layer-changes">
+                <span v-for="(c, i) in m.agent.layers.changes" :key="i" class="change-chip">
+                  {{ c.label }}：{{ fmtChangeVal(c) }}
+                </span>
+              </div>
+            </div>
+
+            <div v-if="m.agent.layers.charts && m.agent.layers.charts.length" class="layer-block">
+              <div class="layer-step">③ 财务画像</div>
+              <div v-for="(b, i) in m.agent.layers.charts" :key="i" class="layer-chart-block">
+                <div class="layer-chart-q">{{ b.question }}</div>
+                <component :is="chartComponent(b.chart)" :data="b.data" />
+              </div>
+            </div>
+
+            <div v-if="m.agent.layers.judgment" class="layer-block">
+              <div class="layer-step">④ 我的判断</div>
+              <div class="agent-finding">{{ m.agent.layers.judgment }}</div>
+            </div>
+
+            <div v-if="m.agent.layers.action_plan && m.agent.layers.action_plan.length" class="layer-block">
+              <div class="layer-step">⑤ 下一步</div>
+              <div class="agent-next">
+                <span v-for="(a, i) in m.agent.layers.action_plan" :key="i" class="chip">{{ a }}</span>
+              </div>
+            </div>
+          </template>
+
+          <!-- 旧扁平渲染兜底（无 layers：澄清/拒绝/错误，或旧缓存） -->
+          <template v-else>
+            <div class="agent-intent">{{ m.agent.summary }}</div>
+            <div v-if="m.agent.finding" class="agent-finding">{{ m.agent.finding }}</div>
+            <ul v-if="m.agent.metrics && m.agent.metrics.length" class="agent-metrics">
+              <li v-for="(x, i) in m.agent.metrics" :key="i">
+                <b>{{ x.label }}</b> {{ fmtMetric(x) }}
+                <span class="src" :title="x.source">{{ x.source }}</span>
+              </li>
+            </ul>
+            <ul v-if="m.agent.recommendations && m.agent.recommendations.length" class="agent-recs">
+              <li v-for="(r, i) in m.agent.recommendations" :key="i">{{ r }}</li>
+            </ul>
+            <div v-if="m.agent.next_actions && m.agent.next_actions.length" class="agent-next">
+              <span v-for="(a, i) in m.agent.next_actions" :key="i" class="chip">{{ a }}</span>
+            </div>
+          </template>
         </div>
         <div v-else class="chat-msg" :class="m.who">{{ m.text }}</div>
       </div>

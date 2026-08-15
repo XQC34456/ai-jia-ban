@@ -2,12 +2,14 @@
 // 只读后端 build_goals 返回的 GoalOut 统一列表，零财富计算（金额/缺口/覆盖度全部来自后端）。
 import { store, loadGoals } from '../store.js';
 import { fmtMoney, fmtPct } from '../format.js';
+import { GoalProgress } from '../charts.js';
 
 const { onMounted, computed } = Vue;
 
 const PRIORITY_LABELS = { 1: '高', 2: '中', 3: '低' };
 
 export const GoalsView = {
+  components: { GoalProgress },
   setup() {
     onMounted(() => { loadGoals().catch(() => {}); });
 
@@ -26,6 +28,11 @@ export const GoalsView = {
         <div v-if="!goals.length" class="card">
           <div class="empty-hint">尚未设置家庭目标。可到「AI 顾问」对话建档，例如「给孩子准备教育金，目标 100 万」。</div>
         </div>
+
+        <section v-else class="panel">
+          <div class="card-title">目标完成进度 · 哪个最落后？</div>
+          <goal-progress :data="goals" />
+        </section>
 
         <div v-for="g in goals" :key="g.goal_id" class="panel">
           <div class="goal-top">

@@ -14,7 +14,7 @@ from .response import build_validity_conditions
 
 __all__ = ["record_turn", "build_conversation_summary", "record_fact",
            "is_safe_fact_value", "record_judgment", "detect_invalidation",
-           "build_memory_context"]
+           "build_memory_context", "build_review_status", "INVALIDATION_LABELS"]
 
 # 短期对话记忆限量（轮数，一轮 = user + assistant 两条）
 CONVERSATION_WINDOW = 5
@@ -84,6 +84,19 @@ def record_judgment(user: dict, resp) -> int | None:
     )
 
 
+def _diff_conditions(conds: dict, current: dict) -> list[dict]:
+    """逐 key 对比有效性条件 vs 当前值，返回变化清单 [{key, before, after}]。
+
+    确定性取数，数字直接来自 overview 派生值，绝不由 LLM 计算。
+    """
+    out = []
+    for k, before in (conds or {}).items():
+        after = current.get(k)
+        if after is not None and after != before:
+            out.append({"key": k, "before": before, "after": after})
+    return out
+
+
 def detect_invalidation(family_id: int) -> list[dict]:
     """确定性检测最近 active 判断是否失效（当前状态 vs validity_conditions 逐 key 对比）。
 
@@ -95,12 +108,7 @@ def detect_invalidation(family_id: int) -> list[dict]:
         return []
     data = db.dump_family(family_id)
     current = build_validity_conditions(build_overview(data))
-    conds = j["validity_conditions"] or {}
-    changed = []
-    for k, before in conds.items():
-        after = current.get(k)
-        if after is not None and after != before:
-            changed.append({"key": k, "before": before, "after": after})
+    changed = _diff_conditions(j["validity_conditions"] or {}, current)
     if changed:
         db.invalidate_judgment(j["id"])
     return changed
@@ -116,6 +124,9 @@ _INVALIDATION_LABELS = {
     "insurance_count": "保险份数",
     "total_coverage": "保险总保额",
 }
+
+# 公开别名：供 review-status 端点复用，避免 API 层依赖私有名。
+INVALIDATION_LABELS = _INVALIDATION_LABELS
 
 
 def build_memory_context(family_id: int,
@@ -157,3 +168,25 @@ def build_memory_context(family_id: int,
         parts.append("【上次判断】\n" + "\n".join(lines))
 
     return "\n\n".join(parts)
+
+
+def build_review_status(family_id: int) -> dict:
+    """确定性返回最近判断的评估状态 + 失效维度，供驾驶舱横幅展示。
+
+    只读记忆表 + 触发失效标记（detect_invalidation），零 LLM、零财富计算。
+    stale_reasons 独立于 detect_invalidation 的一次性返回值计算：即便判断早已
+    stale，也能持续对比 validity_conditions 与当前值，展示「哪些维度变了」。
+    """
+    j = db.latest_judgment(family_id)
+    if j is None:
+        return {"has_judgment": False, "status": None, "stale_reasons": []}
+    detect_invalidation(family_id)  # active 且变化 → 标记 stale
+    data = db.dump_family(family_id)
+    current = build_validity_conditions(build_overview(data))
+    reasons = [
+        {"key": c["key"], "label": INVALIDATION_LABELS.get(c["key"], c["key"]),
+         "before": c["before"], "after": c["after"]}
+        for c in _diff_conditions(j["validity_conditions"] or {}, current)
+    ]
+    j2 = db.latest_judgment(family_id)  # 取 invalidate 后的最新 status
+    return {"has_judgment": True, "status": j2["status"], "stale_reasons": reasons}

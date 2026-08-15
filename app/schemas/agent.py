@@ -6,13 +6,14 @@
 场景别名受 SCENARIO_NAMES 约束：新增场景时先改 C3.5 场景契约，
 再由 test_agent_contract 迫使本层同步，而非本层自行扩展。
 """
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
 __all__ = [
     "AGENT_INTENTS", "INTENT_TO_ENDPOINT", "INTENT_SUBFIELD", "SCENARIO_ALIASES",
     "MetricRef", "PriorityRef", "EvidenceRef", "TradeoffRef", "UncertaintyRef",
+    "ChartBlock", "AdvisorLayers",
     "AgentResponse", "AgentRequest",
 ]
 
@@ -104,6 +105,25 @@ class UncertaintyRef(BaseModel):
     alternatives: list[str] = Field(default_factory=list)   # 备选解释
 
 
+# ---------- V2.6 五层结构化回答契约：系统层 vs LLM 叙事层分离 ----------
+
+class ChartBlock(BaseModel):
+    """③ 财务画像证据块：一张图回答一个明确财务问题，data 是确定性 overview 子块原样搬运。"""
+    chart: str                 # 对应 charts.js 组件名（radar/cashflow/allocation/debt/protection/goals/retirement）
+    question: str              # 该图回答的财务问题（人话）
+    data: Any = None           # 确定性数据块（overview 对应子块，绝无计算）
+
+
+class AdvisorLayers(BaseModel):
+    """五层结构化回答。系统层（①结论②变化③画像⑤行动）全部来自确定性 overview/review-status；
+    LLM 叙事层（④判断）复用 AgentResponse.finding（数字已剥离）。"""
+    conclusion: str | None = None                       # ① 结论（wealth_level + 主要矛盾）
+    changes: list[dict] = Field(default_factory=list)   # ② 关键变化（review-status stale_reasons）
+    charts: list[ChartBlock] = Field(default_factory=list)  # ③ 财务画像（按用户问题触发）
+    judgment: str | None = None                         # ④ 我的判断（LLM 叙事层）
+    action_plan: list[str] = Field(default_factory=list)   # ⑤ 下一步行动
+
+
 class AgentResponse(BaseModel):
     """Agent 结构化输出：所有数字来自 API 返回，禁止编造字段。"""
     intent: Literal[AGENT_INTENTS]
@@ -120,6 +140,8 @@ class AgentResponse(BaseModel):
     evidence: list[EvidenceRef] = Field(default_factory=list)
     tradeoffs: list[TradeoffRef] = Field(default_factory=list)
     uncertainty: UncertaintyRef | None = None
+    # ---- V2.6 新增（只扩不减，缺省 None → 前端走旧扁平渲染兜底） ----
+    layers: AdvisorLayers | None = None
 
 
 class AgentRequest(BaseModel):

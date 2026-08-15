@@ -556,6 +556,22 @@ button { font-family: inherit; }
 .agent-next { display: flex; flex-wrap: wrap; gap: 6px; }
 .agent-next .chip { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-dark); border: 1px solid var(--brand-line); }
 
+/* V2.6 五层回答：①结论→②关键变化→③财务画像→④我的判断→⑤下一步 */
+.layer-block { display: flex; flex-direction: column; gap: 8px; }
+.layer-step { font-size: 11px; font-weight: 700; letter-spacing: 0.03em; color: var(--brand-dark); text-transform: none; }
+.layer-conclusion {
+  background: var(--brand-soft); border: 1px solid var(--brand-line); border-radius: 10px;
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;
+}
+.layer-conclusion-text { font-size: 13px; font-weight: 600; line-height: 1.6; color: var(--text); }
+.layer-changes { display: flex; flex-wrap: wrap; gap: 6px; }
+.change-chip {
+  font-size: 12px; padding: 4px 10px; border-radius: 8px;
+  background: #fff7e0; color: #8a6d1a; border: 1px solid #f0dfa2;
+}
+.layer-chart-block { display: flex; flex-direction: column; gap: 6px; }
+.layer-chart-q { font-size: 13px; color: var(--muted); font-weight: 500; }
+
 .chat-input-row { display: flex; gap: 10px; align-items: flex-end; }
 .chat-input {
   flex: 1; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px;
@@ -659,6 +675,24 @@ button { font-family: inherit; }
 }
 .report-score-inline { margin-left: auto; font-size: 12px; color: var(--muted); }
 
+/* 动态重评估横幅：上次判断失效（数据变化），提示去顾问重新评估 */
+.stale-banner {
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  border: 1px solid #fecaca;
+  border-left: 4px solid var(--score-caution);
+  border-radius: var(--radius);
+  background: var(--warn-soft);
+}
+.stale-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.stale-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.stale-chip {
+  padding: 3px 10px; border-radius: 999px;
+  background: var(--card); border: 1px solid var(--line);
+  font-size: 13px; color: var(--text);
+}
+.stale-fallback { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+
 .sandbox-banner {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 14px; margin-bottom: 14px;
@@ -676,3 +710,54 @@ button { font-family: inherit; }
 
 .rec-sim { margin-left: auto; white-space: nowrap; color: var(--brand-dark); border-color: var(--brand-line); }
 .rec-sim:hover { color: #fff; background: var(--brand); border-color: var(--brand); }
+
+/* ===== 风险地图 + 行动计划（主链收口） ===== */
+
+.risk-map { margin-top: 4px; }
+.map-title { font-size: 15px; font-weight: 700; color: var(--text); margin: 4px 0 12px; }
+
+.dim-block { margin-bottom: 16px; }
+.dim-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.dim-label { font-size: 14px; font-weight: 700; color: var(--text); }
+.dim-count { font-size: 12px; color: var(--muted); }
+.dim-healthy { font-size: 12px; color: #34c759; font-weight: 600; }
+.issue-panel { margin-bottom: 8px; }
+
+.rec-item { flex-wrap: wrap; }
+.rec-detail { color: var(--muted); flex: 1; min-width: 0; }
+.rec-adopt { white-space: nowrap; color: var(--brand-dark); border-color: var(--brand-line); }
+.rec-adopt:hover { color: #fff; background: var(--brand); border-color: var(--brand); }
+.rec-adopted { font-size: 12px; color: #34c759; white-space: nowrap; }
+
+.plan-panel { margin-top: 20px; }
+.plan-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.plan-item:first-of-type { border-top: none; }
+.plan-check { flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; }
+.plan-body { min-width: 0; flex: 1; }
+.plan-action { font-weight: 600; color: var(--text); }
+.plan-action.done { text-decoration: line-through; color: var(--muted); }
+.plan-detail { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.plan-status { flex-shrink: 0; font-size: 12px; color: var(--muted); }
+.plan-done .plan-status { color: #34c759; }
+.plan-skip .plan-status { color: #94a3b8; }
+
+/* ===== 财富健康雷达页（health）+ 资产配置诊断页（allocation） ===== */
+
+.health-top { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.health-score { text-align: center; }
+.health-meta { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.health-weak { font-size: 14px; color: #ff3b30; }
+.health-weak.ok { color: #34c759; }
+
+.dim-row { padding: 10px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.dim-row:first-child { border-top: none; padding-top: 0; }
+.dim-row .dim-head { margin-bottom: 0; }
+.dim-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.dim-score { font-size: 14px; font-weight: 700; margin-left: auto; }
+.dim-score.pos { color: #34c759; }
+.dim-score.warn { color: #ff9500; }
+.dim-score.neg { color: #ff3b30; }
+.dim-bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.dim-bar i { display: block; height: 100%; border-radius: 4px; transition: width .3s; }
+.dim-reasons { display: flex; flex-wrap: wrap; gap: 6px; }
+.dim-reason { font-size: 12px; color: var(--muted); background: var(--line); padding: 2px 8px; border-radius: 10px; }
