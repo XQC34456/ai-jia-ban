@@ -395,6 +395,32 @@ def extract_with_llm(message: str, llm) -> list[dict[str, Any]]:
     return actions
 
 
+def validate_actions(actions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """确定性校验：金额必须正数/有限、period 合法、批内去重。不过则丢弃该动作。"""
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for a in actions:
+        norm = _normalize_action(a)
+        if norm is None:
+            continue
+        f = norm["fields"]
+        bad = False
+        for k in ("amount", "value", "monthly_payment", "principal", "target_amount"):
+            v = f.get(k)
+            if v is not None and (not isinstance(v, (int, float)) or v != v or v <= 0):
+                bad = True
+        if bad:
+            continue
+        if f.get("period") not in (None, "月", "年"):
+            f["period"] = "月"
+        key = (norm["kind"], json.dumps(f, ensure_ascii=False, sort_keys=True, default=str))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(norm)
+    return out
+
+
 def get_extractor() -> Any:
     """返回可用的抽取器：优先 LLM，否则规则。"""
     llm = LLMExtractor()

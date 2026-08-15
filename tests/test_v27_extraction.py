@@ -4,8 +4,11 @@
 - 抽取=转写用户原话（金额来自 user 的话），非计算/编造。
 - LLM 抽不到（chat 返回 None / 无 tool_calls）→ 空列表，由上层规则兜底。
 """
-from app.agent.provider import FakeLLMProvider
-from app.extraction import extract_with_llm
+from app.agent.entry import converse
+from app.agent.provider import FakeLLMProvider, NullProvider
+from app.agent.profile import extract_actions, looks_like_filing
+from app.extraction import extract_with_llm, validate_actions
+from app.schemas.agent import AgentResponse
 
 
 def test_extract_with_llm_multi_field():
@@ -39,3 +42,63 @@ def test_extract_with_llm_no_toolcall_returns_empty():
 def test_extract_with_llm_chat_none_returns_empty():
     llm = FakeLLMProvider(chat_script=[])  # 脚本耗尽 → chat 返回 None
     assert extract_with_llm("随便说一句", llm) == []
+
+
+# ---------- Task 2: validate_actions 确定性校验 ----------
+
+def test_validate_actions_drops_negative_amount():
+    actions = [{"kind": "income", "fields": {"category": "工资", "amount": -500, "period": "月"}}]
+    assert validate_actions(actions) == []
+
+
+def test_validate_actions_drops_non_numeric():
+    actions = [{"kind": "expense", "fields": {"category": "房租", "amount": "很多", "period": "月"}}]
+    assert validate_actions(actions) == []
+
+
+def test_validate_actions_dedups_batch():
+    a = {"kind": "expense", "fields": {"category": "房租", "amount": 5000, "period": "月"}}
+    assert validate_actions([a, dict(a)]) == [a]
+
+
+# ---------- Task 2: LLM 主 + 规则兜底 ----------
+
+def test_extract_actions_llm_primary():
+    llm = FakeLLMProvider(chat_script=[{
+        "content": None,
+        "tool_calls": [{"id": "c1", "name": "record_family_info",
+                        "arguments": {"actions": [
+                            {"kind": "income", "fields": {"category": "工资", "amount": 38000,
+                                                          "period": "月", "person_name": "本人"}},
+                        ]}}],
+    }])
+    actions = extract_actions("我月收入3.8万", llm)
+    assert len(actions) == 1
+    assert actions[0]["fields"]["amount"] == 38000
+
+
+def test_extract_actions_rule_fallback_when_llm_empty():
+    llm = FakeLLMProvider(chat_script=[{"content": None, "tool_calls": []}])  # LLM 抽不到
+    actions = extract_actions("我月薪2万", llm)
+    assert any(a["kind"] == "income" and a["fields"]["amount"] == 20000 for a in actions)
+
+
+# ---------- Task 2: 第三层「明确追问」判定 ----------
+
+def test_looks_like_filing_true_for_statement():
+    assert looks_like_filing("我收入还行，房贷不太多") is True
+
+
+def test_looks_like_filing_true_when_amount_present():
+    assert looks_like_filing("我有房贷3000，想优化资产配置") is True
+
+
+def test_looks_like_filing_false_for_question():
+    assert looks_like_filing("我的资产配置合理吗") is False
+
+
+def test_converse_filing_miss_asks_clarification(family_id):
+    r = converse("我收入还行，房贷不太多",
+                 {"family_id": family_id, "tier": "free", "id": 1}, llm=NullProvider())
+    assert isinstance(r, AgentResponse)
+    assert r.status == "need_clarification"

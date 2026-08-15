@@ -6,24 +6,67 @@
 """
 from __future__ import annotations
 
+import logging
+import re
 import uuid
 from typing import Any
 
 from .. import db
-from ..extraction import RuleExtractor
+from ..extraction import RuleExtractor, extract_with_llm, validate_actions
 from ..schemas.agent import AppliedResponse, ConfirmCard
 from .memory import record_fact
+from .provider import LLMProvider
 
 _PENDING: dict[str, dict[str, Any]] = {}
 
+logger = logging.getLogger(__name__)
 
-def extract_actions(message: str) -> list[dict[str, Any]]:
+
+def extract_actions(message: str, llm: LLMProvider | None = None) -> list[dict[str, Any]]:
     """从自然语言抽取建档动作；空列表 = 非建档表述（交给 Agent 走七意图）。
 
-    只用确定性规则抽取：AI 顾问主链路必须确定性、绝不 500，也不让 LLM 抽取
-    抢先把「投资/买房」等情景表述误判成建档（LLM 抽取留待后续阶段）。
+    V27.1 三级：
+    1) LLM 主抽取（function-calling，一次抽全）→ validate；
+    2) LLM 不可用/抽空 → RuleExtractor 兜底 → validate；
+    3) 两者都空 → 由 converse 用 looks_like_filing 决定「明确追问」还是「七意图」。
+    落地仍只在确认卡确认后，防 LLM 幻觉污染数据。
+
+    先 looks_like_filing 廉价预判：非建档表述（提问/情景）不浪费 LLM 抽取调用，
+    直接走规则 → 空 → 七意图。
     """
-    return RuleExtractor().extract(message)
+    if llm is not None and looks_like_filing(message):
+        try:
+            actions = extract_with_llm(message, llm)
+        except Exception as e:  # LLM 异常不静默吞：记日志后降级规则
+            logger.warning("LLM 抽取失败，降级规则抽取：%s", e)
+            actions = []
+        if actions:
+            return validate_actions(actions)
+    return validate_actions(RuleExtractor().extract(message))
+
+
+_FILING_HINT_RE = re.compile(
+    r"月薪|一个月|每月|工资|月入|收入|支出|开销|花销|房贷|车贷|消费贷|信用卡|"
+    r"房租|学费|生活费|月供|存款|现金|活期|基金|股票|房产|资产|负债|保险|应急金|净资产"
+)
+# 情景动词（投资/买房等）→ 不是建档陈述，交给 SCENARIO/七意图
+_SCENARIO_RE = re.compile(r"投资|买房|买股票|提前还|理财|贷款|借钱|投点")
+_QUESTION_RE = re.compile(r"[?？]|吗|呢|怎么|如何|怎样|帮我|建议|分析|问题|风险|最大")
+
+
+def looks_like_filing(message: str) -> bool:
+    """粗略判定「介绍家庭财务」：财务关键词 + 金额；或财务关键词无金额但非疑问非情景。
+
+    用途：1) extract_actions 里廉价预判是否值得走 LLM 抽取；2) converse 第三层
+    决定「明确追问」还是「交给七意图」。
+    """
+    if _SCENARIO_RE.search(message):
+        return False
+    if not _FILING_HINT_RE.search(message):
+        return False
+    if re.search(r"\d", message):
+        return True
+    return not _QUESTION_RE.search(message)
 
 
 def create_confirm(family_id: int, actions: list[dict[str, Any]]) -> ConfirmCard:
