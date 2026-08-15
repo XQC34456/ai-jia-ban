@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/wealth", tags=["scenario"])
 @router.post("/scenario/{name}")
 def run_scenario_endpoint(name: str, body: ScenarioRequest, user: dict = Depends(get_current_user)):
     """统一情景模拟入口。name ∈ {buy_house, prepay, invest, income_change}。"""
-    require_vip(user)
+    require_vip(user, "scenario")
     if name not in SCENARIO_NAMES:
         raise HTTPException(400, f"未知场景: {name}")
     data = db.dump_family(user["family_id"])
@@ -49,7 +49,7 @@ def compare_scenarios_endpoint(name: str, body: CompareRequest, user: dict = Dep
 
     双层错误契约：参数类型/范围非法 → 422；参数合法但当前家庭数据不可执行 → 400。
     """
-    require_vip(user)
+    require_vip(user, "scenario")
     if name not in SCENARIO_NAMES:
         raise HTTPException(400, f"未知场景: {name}")
     if not body.options:

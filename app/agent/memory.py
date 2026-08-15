@@ -180,7 +180,9 @@ def build_review_status(family_id: int) -> dict:
     j = db.latest_judgment(family_id)
     if j is None:
         return {"has_judgment": False, "status": None, "stale_reasons": []}
-    detect_invalidation(family_id)  # active 且变化 → 标记 stale
+    changed = detect_invalidation(family_id)  # active 且变化 → 标记 stale
+    if changed:  # 埋点：驾驶舱横幅路径首次触发失效（与 converse 二选一，不会重复）
+        db.record_event(family_id, "stale_detected", meta={"count": len(changed)})
     data = db.dump_family(family_id)
     current = build_validity_conditions(build_overview(data))
     reasons = [

@@ -155,6 +155,9 @@ def migrate() -> None:
         if version < 6:
             _migrate_v6(conn)
             version = 6
+        if version < 7:
+            _migrate_v7(conn)
+            version = 7
         conn.execute(
             "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
             (str(version),),
@@ -333,6 +336,25 @@ def _migrate_v6(conn: sqlite3.Connection) -> None:
             FOREIGN KEY(family_id) REFERENCES family(id)
         )
     """)
+
+
+def _migrate_v7(conn: sqlite3.Connection) -> None:
+    """内测观察期：新增轻量产品事件表（埋点，只记「用户做了什么」，不参与财富计算）。"""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS product_event (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            family_id INTEGER NOT NULL,
+            event_type TEXT NOT NULL,
+            intent TEXT,
+            meta TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(family_id) REFERENCES family(id)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_product_event_family "
+        "ON product_event (family_id, id)"
+    )
 
 
 def create_family(name: str = "我的家庭") -> int:
@@ -706,6 +728,37 @@ def update_action_plan_status(plan_id: int, status: str) -> None:
         conn.close()
 
 
+# ---------- 内测观察期：轻量产品事件（埋点，只记「用户做了什么」） ----------
+
+def record_event(family_id: int, event_type: str, intent: str | None = None,
+                 meta: dict | None = None) -> int:
+    """写入一条产品事件。meta 为事件特定附注（JSON 序列化），可为空。
+
+    只做「发生了什么」的事实记录，绝不参与财富计算、绝不回写任何财富主表。
+    """
+    return _insert("product_event", {
+        "family_id": family_id,
+        "event_type": event_type,
+        "intent": intent,
+        "meta": json.dumps(meta, ensure_ascii=False) if meta else None,
+        "created_at": _now(),
+    })
+
+
+def list_events(family_id: int | None = None, limit: int = 5000) -> list[dict]:
+    """按时间正序返回产品事件（family_id=None 时返回全量，供报表脚本观察）。"""
+    if family_id is None:
+        rows = _rows("SELECT * FROM product_event ORDER BY id ASC LIMIT ?", (limit,))
+    else:
+        rows = _rows(
+            "SELECT * FROM product_event WHERE family_id=? ORDER BY id ASC LIMIT ?",
+            (family_id, limit),
+        )
+    for r in rows:
+        r["meta"] = json.loads(r["meta"]) if r["meta"] else None
+    return rows
+
+
 # ---------- 看板直接编辑的通用 CRUD ----------
 
 # 每个实体允许写入的列白名单（同时防 SQL 注入）；值为类型，用于把 JSON 值强转。
@@ -890,6 +943,7 @@ _FAMILY_TABLES = [
     "person", "asset", "liability", "cashflow", "goal", "reminder",
     "insurance", "family_profile", "scenario_snapshot",
     "conversation_message", "memory_fact", "advisor_judgment",
+    "product_event",
 ]
 
 

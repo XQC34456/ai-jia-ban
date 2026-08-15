@@ -29,21 +29,32 @@ def converse(message: str, user: dict, llm: LLMProvider | None = None,
 
     V27.1 三级：抽取命中 → 确认卡；抽空但像建档 → need_clarification 明确追问；
     否则 → 七意图 Agent。user 需含 family_id（tier 供 SCENARIO_COMPARE 的 VIP 门）。
+
+    内测观察期埋点：每条用户消息 → 一条 intent_asked（记「最终路由后」的 intent，
+    建档路径记 filing）；失效触发 → 一条 stale_detected。只记事实，不参与财富计算。
     """
+    family_id = user["family_id"]
     actions = extract_actions(message, llm=llm)
     if actions:
-        return create_confirm(user["family_id"], actions)
+        db.record_event(family_id, "intent_asked", intent="filing")
+        return create_confirm(family_id, actions)
     if looks_like_filing(message):
+        db.record_event(family_id, "intent_asked", intent="filing",
+                        meta={"status": "need_clarification"})
         return build_response("EXPLAIN_RESULT", "need_clarification", None,
                               summary=_FILING_CLARIFY_SUMMARY)
     wealth_context = _wealth_context_text(user)
-    invalidation = detect_invalidation(user["family_id"])   # 先确定性失效检测（标记 stale）
-    memory_context = build_memory_context(user["family_id"], invalidation=invalidation)
+    invalidation = detect_invalidation(family_id)   # 先确定性失效检测（标记 stale）
+    if invalidation:
+        db.record_event(family_id, "stale_detected", meta={"count": len(invalidation)})
+    memory_context = build_memory_context(family_id, invalidation=invalidation)
     result = handle(message, user, llm=llm, context=context, wealth_context=wealth_context,
                     memory_context=memory_context)
     if isinstance(result, AgentResponse):
-        result = attach_layers(result, user["family_id"], invalidation)
-    record_turn(user["family_id"], message, result)
+        result = attach_layers(result, family_id, invalidation)
+        db.record_event(family_id, "intent_asked", intent=result.intent,
+                        meta={"status": result.status})
+    record_turn(family_id, message, result)
     return result
 
 

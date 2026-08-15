@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import db, decision, report
-from .api import agent, goal, onboarding, scenario, wealth
+from .api import agent, event, goal, onboarding, scenario, wealth
 from .agent.profile import apply_confirmation
 
 
@@ -44,6 +44,7 @@ app.add_middleware(
 )
 
 app.include_router(wealth.router)
+app.include_router(event.router)
 app.include_router(onboarding.router)
 app.include_router(scenario.router)
 app.include_router(goal.router)
@@ -125,6 +126,7 @@ def me(user: dict = Depends(get_current_user)):
 def upgrade(user: dict = Depends(get_current_user)):
     """模拟开通 VIP（无支付）。TODO: 接入真实支付后替换此路由。"""
     db.set_tier(user["id"], "vip")
+    db.record_event(user["family_id"], "upgrade")
     return {"tier": "vip"}
 
 
@@ -156,13 +158,13 @@ def confirm_endpoint(body: ConfirmIn, user: dict = Depends(get_current_user)):
 
 @app.get("/api/report")
 def get_report(user: dict = Depends(get_current_user)):
-    _require_vip(user)
+    _require_vip(user, "report")
     return report.build_report(user["family_id"])
 
 
 @app.post("/api/decision")
 def decision_endpoint(body: DecisionIn, user: dict = Depends(get_current_user)):
-    _require_vip(user)
+    _require_vip(user, "decision")
     return decision.simulate(user["family_id"], body.scenario, body.params)
 
 

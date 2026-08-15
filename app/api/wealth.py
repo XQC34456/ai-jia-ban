@@ -61,6 +61,9 @@ def create_action_plan(body: ActionPlanCreate, user: dict = Depends(get_current_
     if not body.action or not body.action.strip():
         raise HTTPException(400, "action 不能为空")
     pid = db.create_action_plan(user["family_id"], body.issue_id, body.action.strip(), body.detail)
+    if pid is not None:  # 去重命中（同 issue+action 已有 todo）不重复埋采纳
+        db.record_event(user["family_id"], "adopt",
+                        meta={"issue_id": body.issue_id, "action": body.action.strip()})
     return {"id": pid}
 
 
@@ -73,4 +76,6 @@ def update_action_plan(plan_id: int, body: ActionPlanUpdate,
     if db.get_entity_owner("action_plan", plan_id) != user["family_id"]:
         raise HTTPException(404, "计划不存在")
     db.update_action_plan_status(plan_id, body.status)
+    if body.status == "done":
+        db.record_event(user["family_id"], "action_complete", meta={"plan_id": plan_id})
     return {"ok": True}

@@ -21,6 +21,8 @@ def get_current_user(authorization: str | None = Header(default=None)) -> dict:
     return user
 
 
-def require_vip(user: dict) -> None:
+def require_vip(user: dict, scope: str = "vip") -> None:
+    """VIP 门：Free 用户触发 → 埋 vip_boundary_hit 后 403（scope 标记触发了哪个能力）。"""
     if user.get("tier") != "vip":
+        db.record_event(user["family_id"], "vip_boundary_hit", meta={"scope": scope})
         raise HTTPException(403, "深度报告和决策模拟是 VIP 专属功能，升级后即可使用")

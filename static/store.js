@@ -108,6 +108,16 @@ export async function upgrade() {
   return r;
 }
 
+// 内测观察期：上报一条轻量产品事件（fire-and-forget，失败绝不影响主流程）。
+export function recordEvent(eventType, meta = {}) {
+  if (!store.auth.token) return Promise.resolve();
+  return api('/api/event', {
+    method: 'POST',
+    body: { event_type: eventType, ...meta },
+    token: store.auth.token,
+  }).catch(() => {});
+}
+
 export async function loadGoals() {
   store.goals.loading = true;
   store.goals.error = null;

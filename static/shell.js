@@ -1,6 +1,6 @@
 // 统一 App Shell：Topbar + Sidebar + Main（hash 路由视图容器）+ 登录门。
 // 铁律：本文件只做「壳」的布局与导航，不做任何财富计算；数据一律来自 store 各切片。
-import { store, loggedIn, login, register, logout, upgrade, deleteAccount, ensureOverview } from './store.js';
+import { store, loggedIn, login, register, logout, upgrade, deleteAccount, ensureOverview, recordEvent } from './store.js';
 import { currentRoute, navigate } from './router.js';
 import { VIEWS, NAV_ITEMS } from './views/index.js';
 import { OnboardingView } from './views/onboarding.js';
@@ -125,6 +125,8 @@ const App = {
     }
     // immediate: 页面加载即已登录（token 已在 localStorage）时也触发一次判断
     watch(loggedIn, (v) => { if (v) checkOnboarding(); else needOnboarding.value = false; }, { immediate: true });
+    // 内测观察期：每次进入（登录成功 / 已登录刷新）都记一条 entry，首条=首次进入、后续=回访。
+    watch(loggedIn, (v) => { if (v) recordEvent('entry'); }, { immediate: true });
     function onOnboardDone() { needOnboarding.value = false; }
     return { loggedIn, currentView, currentRoute, NAV_ITEMS, needOnboarding, onOnboardDone };
   },

@@ -1,6 +1,6 @@
 // 视图：家庭总览（Phase 1 迁移自 cockpit.js 的 KPI 卡 + AI 主动洞察）。
 // 只读 store.overview；AI 洞察 = 确定性 build_issues（P0→P2），不接 LLM。
-import { store, ensureOverview, loadReview } from '../store.js';
+import { store, ensureOverview, loadReview, recordEvent } from '../store.js';
 import { SEV_TONE, LEVEL_CONCLUSION, fmtMoney, fmtPct, fmtRatio } from '../format.js';
 import { navigate } from '../router.js';
 import { HealthRadar } from '../charts.js';
@@ -47,8 +47,11 @@ export const OverviewView = {
       return f(r.before) + ' → ' + f(r.after);
     }
 
+    // 内测观察期：点「去重新评估」→ 埋 reassess（后端看不见这个纯前端跳转），再去顾问。
+    function goReassess() { recordEvent('reassess'); navigate('chat'); }
+
     return { store, top3, bannerTone, LEVEL_CONCLUSION, sevTone,
-             navigate, staleBanner, staleReasons, fmtChangeVal };
+             navigate, staleBanner, staleReasons, fmtChangeVal, goReassess };
   },
   template: `
     <div class="view">
@@ -58,7 +61,7 @@ export const OverviewView = {
           <span v-for="r in staleReasons" :key="r.key" class="stale-chip">{{ r.label }}：{{ fmtChangeVal(r) }}</span>
         </div>
         <div v-else class="stale-fallback">判断依赖的关键数据已变化，建议重新评估</div>
-        <button class="btn-primary btn-sm" @click="navigate('chat')">去 AI 顾问重新评估</button>
+        <button class="btn-primary btn-sm" @click="goReassess">去 AI 顾问重新评估</button>
       </div>
       <div v-if="store.loading" class="state-hint">加载中…</div>
       <div v-else-if="store.error" class="state-hint error">{{ store.error }}</div>
