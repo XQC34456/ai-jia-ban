@@ -94,6 +94,22 @@ def test_delete_user_missing_is_noop(db_tmp):
     db.delete_user(999999)  # 不存在用户 → 静默返回，不抛异常
 
 
+def test_delete_user_removes_action_plan(db_tmp):
+    """回归：采纳过建议（action_plan 有行）的用户删除时必须连带清空，
+    否则删 family 触发 FK 约束失败（_FAMILY_TABLES 曾漏 action_plan）。"""
+    user = db.create_user("delete_plan", "secret123")
+    fid = user["family_id"]
+    pid = db.create_action_plan(fid, "cashflow", "削减非必要支出", "把月度结余转正")
+    assert pid is not None
+    assert _count("action_plan", fid) == 1
+
+    db.delete_user(user["id"])  # 修复前这里抛 IntegrityError
+
+    assert db.get_user(user["id"]) is None
+    assert _count("action_plan", fid) == 0
+    assert db._rows("SELECT COUNT(*) AS c FROM family WHERE id = ?", (fid,))[0]["c"] == 0
+
+
 # ---------- API 层 ----------
 
 def test_delete_account_api(client, auth_headers):
@@ -112,6 +128,30 @@ def test_delete_account_api(client, auth_headers):
     assert _count("person", fid) == 0
     # 旧 token 立即失效
     assert client.get("/api/me", headers=auth_headers).status_code == 401
+
+
+def test_delete_account_api_with_action_plan(client, auth_headers):
+    """回归（真实失败路径）：采纳过建议的用户 DELETE /api/account 必须 200，
+    修复前 action_plan 未清理 → family 删除 FK 500。"""
+    token = auth_headers["Authorization"].split(" ", 1)[1]
+    user = db.get_user_by_token(token)
+    fid = user["family_id"]
+
+    client.post("/api/family/entity/person", headers=auth_headers,
+                json={"name": "本人", "relation": "本人", "birth_year": 1990})
+    r = client.post("/api/wealth/action-plan", headers=auth_headers,
+                    json={"issue_id": "cashflow", "action": "削减非必要支出",
+                          "detail": "把月度结余转正"})
+    assert r.status_code == 200
+    assert _count("action_plan", fid) == 1
+
+    r = client.delete("/api/account", headers=auth_headers)
+    assert r.status_code == 200                      # 修复前这里 500（FK 约束失败）
+    assert r.json() == {"ok": True, "deleted": True}
+
+    assert db.get_user(user["id"]) is None
+    assert _count("action_plan", fid) == 0
+    assert db._rows("SELECT COUNT(*) AS c FROM family WHERE id = ?", (fid,))[0]["c"] == 0
 
 
 def test_agent_chat_rate_limited(client, auth_headers, monkeypatch):

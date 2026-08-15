@@ -943,7 +943,7 @@ _FAMILY_TABLES = [
     "person", "asset", "liability", "cashflow", "goal", "reminder",
     "insurance", "family_profile", "scenario_snapshot",
     "conversation_message", "memory_fact", "advisor_judgment",
-    "product_event",
+    "action_plan", "product_event",
 ]
 
 
