@@ -293,8 +293,13 @@ def apply_confirmation(family_id: int, pending_id: str, confirmed: bool) -> Appl
             continue
         if rc.status == "conflict":
             if rc.matched_id is not None and rc.table:
-                # 单匹配冲突：确认后覆盖更新（同身份行 update，非新增）
-                db.update_entity(rc.table, rc.matched_id, a["fields"])
+                # 单匹配冲突：确认后覆盖更新，但**只更新允许的 value 字段**——
+                # identity 与 name 等身份锚字段永不被覆盖（第二刀硬契约，
+                # 修掉「现金」被改写成「存款」这类整行替换残余）。
+                spec = _RECONCILE_SPEC.get(a["kind"])
+                value_fields = {c: a["fields"][c] for c in (spec["value"] if spec else ())
+                                if c in a["fields"]}
+                db.update_entity(rc.table, rc.matched_id, value_fields)
                 applied_summaries.append(a["summary"])
                 _record_goal_fact(family_id, a)
             else:

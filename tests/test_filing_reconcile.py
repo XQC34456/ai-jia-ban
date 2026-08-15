@@ -141,3 +141,59 @@ def test_R7_all_exists_writes_nothing(family_id):
     r = apply_confirmation(family_id, resp.pending_id, True)
     assert r.type == "applied"
     assert len(db.get_assets(family_id)) == 1
+
+
+# ---------- R8：冲突覆盖只更新值字段，name 永不被覆盖（第二刀硬契约） ----------
+
+def test_R8_conflict_overwrite_preserves_name(family_id):
+    # 档案：type=存款 name=现金 value=50 万（name 是身份锚字段，跨抽取不稳定）
+    db.apply_action(family_id, {"kind": "asset",
+                                "fields": {"type": "存款", "name": "现金", "value": 500000},
+                                "summary": "现金 500,000 元"})
+    # 用户更新：存款 30 万（RuleExtractor name=存款，与档案 name=现金 不同）
+    action = {"kind": "asset",
+              "fields": {"type": "存款", "name": "存款", "value": 300000},
+              "summary": "存款 300,000 元"}
+    rc = reconcile_actions(family_id, [action])
+    assert rc[0].status == "conflict" and rc[0].matched_id is not None
+
+    card = create_confirm(family_id, [action])
+    assert "档案现在是" in card.items[0]
+
+    r = apply_confirmation(family_id, card.pending_id, True)
+    assert r.type == "applied"
+    a = db.get_assets(family_id)
+    assert len(a) == 1
+    assert a[0]["value"] == 300000    # 值字段覆盖
+    assert a[0]["name"] == "现金"      # 身份锚字段 name 不被覆盖
+
+
+# ---------- R9：冲突覆盖只更新允许的 value 字段，其余字段（含非 value 字段）保留 ----------
+
+def test_R9_conflict_updates_only_value_fields(family_id):
+    # 档案：房贷 principal 200 万、月供 8000、利率 5%
+    db.apply_action(family_id, {"kind": "liability",
+                                "fields": {"type": "房贷", "name": "房贷",
+                                           "principal": 2000000, "monthly_payment": 8000,
+                                           "interest_rate": 0.05},
+                                "summary": "房贷 2,000,000 元"})
+    # 用户更新：月供涨到 9000 且提到利率变 6%
+    #   interest_rate 不在 _RECONCILE_SPEC 的 value 里 → 即使动作带了也不该被覆盖
+    action = {"kind": "liability",
+              "fields": {"type": "房贷", "name": "房贷",
+                         "monthly_payment": 9000, "interest_rate": 0.06},
+              "summary": "房贷月供 9,000 元"}
+    rc = reconcile_actions(family_id, [action])
+    assert rc[0].status == "conflict" and rc[0].matched_id is not None
+
+    card = create_confirm(family_id, [action])
+    assert "档案现在是" in card.items[0]
+
+    r = apply_confirmation(family_id, card.pending_id, True)
+    assert r.type == "applied"
+    lb = db.get_liabilities(family_id)
+    assert len(lb) == 1
+    assert lb[0]["monthly_payment"] == 9000     # value 字段覆盖
+    assert lb[0]["principal"] == 2000000        # value 字段（未提及）保留
+    assert lb[0]["name"] == "房贷"               # 身份锚字段保留
+    assert lb[0]["interest_rate"] == 0.05       # 非 value 字段保留（即使动作带了）
