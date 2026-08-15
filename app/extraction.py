@@ -329,28 +329,70 @@ class LLMExtractor:
 def _summarize(action: dict[str, Any]) -> str:
     f = action["fields"]
     kind = action["kind"]
-    name_map = {"person": "成员", "income": "收入", "expense": "支出",
-                "asset": "资产", "liability": "负债", "goal": "目标"}
 
     if kind == "liability":
-        label = f.get("type") or f.get("name") or ""
+        label = f.get("type") or f.get("name") or "负债"
         if f.get("monthly_payment"):
-            return f"负债：{label} 月供 {f['monthly_payment']:,.0f} 元".strip()
+            return f"{label}月供 {f['monthly_payment']:,.0f} 元"
         if f.get("principal"):
-            return f"负债：{label} 本金 {f['principal']:,.0f} 元".strip()
-        return f"负债：{label}".strip()
+            return f"{label}本金 {f['principal']:,.0f} 元"
+        return label
 
     if kind == "person":
-        name = f.get("name") or ""
+        name = f.get("name") or "成员"
         if f.get("birth_year"):
             age = date.today().year - int(f["birth_year"])
-            return f"成员：{name}（{age} 岁）".strip()
-        return f"成员：{name}".strip()
+            return f"{name}（{age} 岁）"
+        return name
 
-    amt = f.get("amount") or f.get("value") or f.get("target_amount")
-    if amt is not None:
-        return f"{name_map.get(kind, kind)}：{f.get('name') or f.get('type') or ''} {amt:,.0f} 元".strip()
-    return f"{name_map.get(kind, kind)}：{f.get('name') or f.get('type') or ''}".strip()
+    if kind == "income":
+        who = f.get("person_name") or ""
+        per = "年收入" if f.get("period") == "年" else "月收入"
+        return f"{who}{per} {f['amount']:,.0f} 元" if f.get("amount") is not None else f"{who}{per}"
+
+    if kind == "expense":
+        cat = f.get("category") or "其他"
+        per = "年" if f.get("period") == "年" else "月"
+        return f"{cat} {f['amount']:,.0f} 元/{per}" if f.get("amount") is not None else cat
+
+    if kind == "asset":
+        label = f"{f.get('type') or '资产'}{f.get('name') or ''}".strip()
+        return f"{label} {f['value']:,.0f} 元" if f.get("value") is not None else label
+
+    if kind == "goal":
+        g = f.get("type") or "目标"
+        return f"{g} {f['target_amount']:,.0f} 元" if f.get("target_amount") is not None else g
+
+    return kind
+
+
+def extract_with_llm(message: str, llm) -> list[dict[str, Any]]:
+    """用注入的 LLMProvider（chat + function-calling）做一次结构化抽取。
+
+    返回规范化动作列表；llm 为 None / chat 返回 None / 无 tool_calls → []。
+    金额全部来自用户原话转写（非计算），符合铁律。
+    """
+    result = llm.chat(
+        [
+            {"role": "system", "content": f"当前年份是 {date.today().year} 年。"},
+            {"role": "user", "content": message},
+        ],
+        [_EXTRACT_TOOL],
+    )
+    if not result:
+        return []
+    actions: list[dict[str, Any]] = []
+    for call in result.get("tool_calls") or []:
+        if call.get("name") != "record_family_info":
+            continue
+        args = call.get("arguments") or {}
+        for a in args.get("actions", []):
+            norm = _normalize_action(a)
+            if norm is None:
+                continue
+            norm["summary"] = _summarize(norm)
+            actions.append(norm)
+    return actions
 
 
 def get_extractor() -> Any:
