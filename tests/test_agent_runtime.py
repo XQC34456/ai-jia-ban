@@ -78,6 +78,23 @@ def test_route_intent_deterministic():
     assert route_intent("随便聊聊天") == "VIEW_OVERVIEW"       # 兜底
 
 
+def test_route_intent_unemployment_liquidity():
+    # 失业/撑多久 = 流动性风险 → CHECK_ISSUES（应急资金月数 emergency_months）
+    assert route_intent("如果我失业半年能撑多久") == "CHECK_ISSUES"
+    assert route_intent("我失业了能撑多久") == "CHECK_ISSUES"
+
+
+def test_route_intent_prepay_car_loan_scenario():
+    # 「提前还车贷」的「车」夹在「还」「贷」之间，旧关键词「提前还贷/还贷」匹配不到 → 曾落 LLM 兜底不稳定
+    assert route_intent("我该不该提前还车贷") == "SCENARIO_COMPARE"
+    assert route_intent("我该不该提前还房贷") == "SCENARIO_COMPARE"
+
+
+def test_route_intent_surplus_investment_allocation():
+    # 「剩下的钱怎么投」= 结余配置，非目标非情景 → 确定性 CHECK_ALLOCATION（曾落 LLM 兜底不稳定）
+    assert route_intent("我每个月剩下的钱应该怎么投") == "CHECK_ALLOCATION"
+
+
 def test_route_intent_llm_fallback():
     llm = FakeLLMProvider(router_script=[{"intent": "CHECK_ALLOCATION"}])
     assert route_intent("帮我看看理财结构", llm) == "CHECK_ALLOCATION"

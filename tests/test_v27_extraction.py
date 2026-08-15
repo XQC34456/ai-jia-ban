@@ -97,6 +97,19 @@ def test_looks_like_filing_false_for_question():
     assert looks_like_filing("我的资产配置合理吗") is False
 
 
+def test_looks_like_filing_false_for_income_change_scenario():
+    # 「收入下降」是情景问题，不是建档陈述：不能被 _FILING_HINT_RE 的「收入」+ 数字误拦
+    assert looks_like_filing("如果收入下降 20% 会怎么样") is False
+
+
+def test_converse_income_change_routes_to_scenario(family_id):
+    # 端到端：收入下降情景 → SCENARIO_COMPARE 追问，绝不走建档追问（EXPLAIN_RESULT）
+    r = converse("如果收入下降 20% 会怎么样",
+                 {"family_id": family_id, "tier": "free", "id": 1}, llm=NullProvider())
+    assert isinstance(r, AgentResponse)
+    assert r.intent == "SCENARIO_COMPARE"
+
+
 def test_converse_filing_miss_asks_clarification(family_id):
     r = converse("我收入还行，房贷不太多",
                  {"family_id": family_id, "tier": "free", "id": 1}, llm=NullProvider())
