@@ -72,3 +72,23 @@ def test_assemble_uncertainty_normalizes_invalid_confidence():
     resp = assemble_advisor_response([], llm_json, "VIEW_OVERVIEW")
     assert resp.uncertainty is not None
     assert resp.uncertainty.confidence == "medium"
+
+
+def test_assemble_summary_fallback_when_llm_summary_has_digit():
+    """P0 修复：LLM summary 含数字被防编造闸剥离后，用 priorities 确定性兜底，绝不留空回复。
+
+    数字来自 issue.finding（Decision 确定性生成），非 LLM 编造，符合铁律。
+    """
+    tool_results = [{"name": "get_wealth_issues", "result": _issues_result()}]
+    # LLM 违反「summary 不写数字」→ 整段被 strip 成空，之前用户看到空回复。
+    llm_json = {"summary": "你储蓄率 77%，应急金覆盖 62 个月，现金大量闲置"}
+    resp = assemble_advisor_response(tool_results, llm_json, "CHECK_ISSUES")
+    assert resp.summary  # 不再空
+    assert "应急金不足" in resp.summary          # 确定性 priorities[0].title
+    assert "3个月" in resp.summary              # 数字来自 issue.finding（系统算）
+
+
+def test_assemble_summary_fallback_without_priorities():
+    """无 issues（健康家庭）时，兜底 summary 仍非空。"""
+    resp = assemble_advisor_response([], {"summary": "净资产 500 万，一切健康"}, "VIEW_OVERVIEW")
+    assert resp.summary  # 通用兜底句，非空

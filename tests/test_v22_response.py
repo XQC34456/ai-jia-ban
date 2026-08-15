@@ -77,7 +77,8 @@ def test_llm_numeric_text_rejected():
         "next_actions": ["帮我比较方案", "存 5 万应急"],
     }
     resp = assemble_advisor_response([], llm_json, "VIEW_OVERVIEW")
-    assert resp.summary == ""                 # 含数字 → 丢弃
+    # summary 含数字 → LLM 数字被剥离，但不再留空回复（确定性兜底句，数字非 LLM 编造）
+    assert resp.summary and "320" not in resp.summary
     assert resp.finding is None               # 含数字 → 丢弃
     assert resp.recommendations == ["先还贷"]  # 含数字条目过滤
     assert resp.next_actions == ["帮我比较方案"]

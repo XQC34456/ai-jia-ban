@@ -629,13 +629,6 @@ button { font-family: inherit; }
   .modal-form { grid-template-columns: 1fr; }
 }
 
-/* 打印：只保留报告内容 */
-@media print {
-  body * { visibility: hidden; }
-  .report-modal, .report-modal * { visibility: visible; }
-  .report-modal { position: absolute; inset: 0; width: 100%; max-width: none; max-height: none; box-shadow: none; border-radius: 0; }
-}
-
 /* ============================================================
    家庭数据（可编辑闭环）
    ============================================================ */

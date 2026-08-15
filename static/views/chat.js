@@ -266,7 +266,77 @@ export const ChatView = {
     }
     function summaryLabel(s) { return s.money ? fmtMoney(s.value) : String(s.value); }
 
-    function printReport() { window.print(); }
+    // 保存报告：把已渲染的报告导出为自包含 HTML 文件（下载），不接打印机、不依赖后端/依赖库。
+    // 只抓取已渲染 DOM（.report-body），数字仍是后端报告字段，零新增计算。
+    const REPORT_CSS = `
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+             background: #F7F6F3; color: #23201D; line-height: 1.6; padding: 32px 16px; }
+      .report { max-width: 720px; margin: 0 auto; background: #FFFFFF; border-radius: 12px;
+                padding: 32px; box-shadow: 0 1px 3px rgba(30,26,22,.06), 0 8px 24px rgba(30,26,22,.06); }
+      header { border-bottom: 2px solid #F2DDB8; padding-bottom: 16px; margin-bottom: 20px; }
+      h1 { font-size: 22px; }
+      .meta { font-size: 13px; color: #6B6560; margin-top: 6px; }
+      h4 { font-size: 15px; margin: 20px 0 10px; color: #B45309; }
+      .rp-meta { font-size: 12px; color: #6B6560; border-bottom: 1px solid #E7E2DA; padding-bottom: 10px; }
+      .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+      .stat { background: #F7F6F3; border: 1px solid #E7E2DA; border-radius: 8px; padding: 10px 12px; }
+      .stat label { display: block; font-size: 12px; color: #6B6560; margin-bottom: 2px; }
+      .stat b { font-size: 16px; font-weight: 700; }
+      .stat.hl { background: #FEF3E2; border-color: #F2DDB8; }
+      .stat.hl b { color: #B45309; }
+      .rp-alloc { display: flex; flex-direction: column; gap: 8px; }
+      .kv { display: flex; justify-content: space-between; align-items: baseline; }
+      .kv span { color: #6B6560; }
+      .kv b { font-weight: 600; }
+      .rp-problem { border-left: 3px solid #D97706; padding: 8px 12px; background: #F7F6F3;
+                    border-radius: 6px; font-size: 13px; margin-bottom: 8px; }
+      .rp-advice-line { color: #6B6560; margin-top: 4px; }
+      .goal-row { border-top: 1px solid #E7E2DA; padding-top: 8px; margin-top: 8px; }
+      .goal-top { display: flex; justify-content: space-between; align-items: center; }
+      .goal-need { font-size: 12px; color: #6B6560; }
+      .goal-progress { height: 6px; border-radius: 4px; background: #EFECE6; overflow: hidden; margin: 6px 0 4px; }
+      .goal-progress i { display: block; height: 100%; background: #D97706; }
+      .goal-meta { font-size: 12px; color: #6B6560; }
+      .rp-advice h4 { font-size: 14px; margin-top: 6px; }
+      .rp-advice ul { margin: 4px 0; padding-left: 18px; }
+      .rp-advice p { margin: 6px 0; }
+      .rp-disclaimer { font-size: 12px; color: #6B6560; border-top: 1px solid #E7E2DA;
+                       padding-top: 12px; margin-top: 16px; }
+      .empty-hint { color: #6B6560; font-size: 13px; padding: 8px 0; }
+      @media print { body { background: #fff; padding: 0; } .report { box-shadow: none; } }
+    `;
+    function saveReport() {
+      const body = document.querySelector('.report-body');
+      if (!body || !report.value) return;
+      const family = report.value.family_name || '家庭财富';
+      const title = family + ' · 家庭财富报告';
+      const date = report.value.generated_at || '';
+      const doc = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(title)}</title>
+<style>${REPORT_CSS}</style>
+</head>
+<body>
+<article class="report">
+  <header><h1>${escapeHtml(title)}</h1><p class="meta">生成日期：${escapeHtml(date)}</p></header>
+  ${body.innerHTML}
+</article>
+</body>
+</html>`;
+      const blob = new Blob([doc], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = family + '-家庭财富报告.html';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
 
     return {
       store, input, sending, chatError, send, confirm, onKey,
@@ -275,7 +345,7 @@ export const ChatView = {
       openDecision, pickDecisionScenario, runDecision, doUpgrade,
       reportOpen, report, reportBusy, reportError, openReport, loadReport,
       reportAdvice, reportMembers, reportAllocation, reportGoals, reportProblems,
-      fmtMoney, fmtVal, fmtMetric, summaryLabel, printReport,
+      fmtMoney, fmtVal, fmtMetric, summaryLabel, saveReport,
       chartComponent, fmtChangeVal,
     };
   },
@@ -459,7 +529,7 @@ export const ChatView = {
         <div class="modal-head">
           <span class="modal-title">{{ report ? (report.family_name + ' · 家庭财富报告') : '深度报告' }}</span>
           <div class="modal-head-actions">
-            <button v-if="report" class="btn-ghost btn-sm" @click="printReport">🖨 打印</button>
+            <button v-if="report" class="btn-ghost btn-sm" @click="saveReport">💾 保存报告</button>
             <button class="modal-close" @click="reportOpen = false">✕</button>
           </div>
         </div>

@@ -442,6 +442,21 @@ def _build_priorities(tool_results: list[dict]) -> list[PriorityRef]:
     return []
 
 
+def _fallback_summary(priorities: list[PriorityRef]) -> str:
+    """LLM summary 含数字被防编造闸剥离后的确定性兜底，绝不留空回复。
+
+    数字来自 Decision issue.finding（系统确定性生成），非 LLM 编造，符合铁律。
+    无 issue 的健康家庭给通用兜底句。
+    """
+    if priorities:
+        p = priorities[0]
+        s = f"当前最需要关注：{p.title}"
+        if p.finding:
+            s += f"（{p.finding}）"
+        return s
+    return "已生成家庭财务分析，详见下方画像与下一步行动。"
+
+
 def build_validity_conditions(overview: dict) -> dict:
     """从 overview 提取判断有效条件快照（固定最小集指标值）。
 
@@ -511,12 +526,12 @@ def assemble_advisor_response(tool_results: list[dict], llm_json: dict | None,
     """
     llm_json = llm_json or {}
     metrics = _metrics_from_tool_results(tool_results)
-    summary = _strip_numeric_text(llm_json.get("summary")) or ""
+    priorities = _build_priorities(tool_results)
+    summary = _strip_numeric_text(llm_json.get("summary")) or _fallback_summary(priorities)
     finding = _strip_numeric_text(llm_json.get("finding"))
     recommendations = _strip_numeric_list(llm_json.get("recommendations"))
     next_actions = _strip_numeric_list(llm_json.get("next_actions"))
     evidence = _build_evidence(tool_results, llm_json.get("evidence"))
-    priorities = _build_priorities(tool_results)
     tradeoffs = _build_tradeoffs(llm_json.get("tradeoffs"))
     uncertainty = _build_uncertainty(llm_json.get("uncertainty"))
     return AgentResponse(
