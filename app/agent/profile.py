@@ -21,6 +21,13 @@ _PENDING: dict[str, dict[str, Any]] = {}
 
 logger = logging.getLogger(__name__)
 
+# 确认卡分组元信息：kind → (组名, 图标)。未知 kind 归「其他」。
+_KIND_META = {
+    "income": ("收入", "🟢"), "expense": ("支出", "🔵"),
+    "asset": ("资产", "🟢"), "liability": ("负债", "🟠"),
+    "goal": ("目标", "🟣"), "person": ("成员", "⚪"),
+}
+
 
 def extract_actions(message: str, llm: LLMProvider | None = None) -> list[dict[str, Any]]:
     """从自然语言抽取建档动作；空列表 = 非建档表述（交给 Agent 走七意图）。
@@ -73,10 +80,19 @@ def create_confirm(family_id: int, actions: list[dict[str, Any]]) -> ConfirmCard
     """把抽取到的动作暂存为 pending，返回确认卡片；未确认前不写库。"""
     pending_id = uuid.uuid4().hex
     _PENDING[pending_id] = {"family_id": family_id, "actions": actions}
+    groups: list[dict[str, Any]] = []
+    for a in actions:
+        label, icon = _KIND_META.get(a["kind"], ("其他", "⚪"))
+        g = next((g for g in groups if g["label"] == label), None)
+        if g is None:
+            g = {"label": label, "icon": icon, "items": []}
+            groups.append(g)
+        g["items"].append(a["summary"])
     return ConfirmCard(
         pending_id=pending_id,
         message="我理解到以下信息，确认后我就为你建档：",
         items=[a["summary"] for a in actions],
+        groups=groups,
     )
 
 

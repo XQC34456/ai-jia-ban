@@ -158,6 +158,7 @@ class ConfirmCard(BaseModel):
     pending_id: str
     message: str
     items: list[str] = Field(default_factory=list)
+    groups: list[dict] = Field(default_factory=list)   # V27.1 分组展示（只扩不减）
 
 
 class AppliedResponse(BaseModel):

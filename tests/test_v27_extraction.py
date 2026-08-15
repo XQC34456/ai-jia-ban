@@ -6,7 +6,7 @@
 """
 from app.agent.entry import converse
 from app.agent.provider import FakeLLMProvider, NullProvider
-from app.agent.profile import extract_actions, looks_like_filing
+from app.agent.profile import create_confirm, extract_actions, looks_like_filing
 from app.extraction import extract_with_llm, validate_actions
 from app.schemas.agent import AgentResponse
 
@@ -102,3 +102,29 @@ def test_converse_filing_miss_asks_clarification(family_id):
                  {"family_id": family_id, "tier": "free", "id": 1}, llm=NullProvider())
     assert isinstance(r, AgentResponse)
     assert r.status == "need_clarification"
+
+
+# ---------- Task 3: 批量确认卡后端 groups 分组 ----------
+
+def test_confirm_card_groups_by_kind():
+    actions = [
+        {"kind": "income", "fields": {"category": "工资", "amount": 38000, "period": "月"},
+         "summary": "本人月收入 38,000 元"},
+        {"kind": "expense", "fields": {"category": "房租", "amount": 5000, "period": "月"},
+         "summary": "房租 5,000 元/月"},
+        {"kind": "expense", "fields": {"category": "生活", "amount": 5000, "period": "月"},
+         "summary": "生活 5,000 元/月"},
+    ]
+    card = create_confirm(1, actions)
+    labels = [g["label"] for g in card.groups]
+    assert labels == ["收入", "支出"]
+    assert card.groups[1]["items"] == ["房租 5,000 元/月", "生活 5,000 元/月"]
+    assert card.groups[1]["icon"] == "🔵"
+    assert len(card.items) == 3  # items 保留（只扩不减）
+
+
+def test_confirm_card_group_fallback_kind():
+    actions = [{"kind": "insurance", "fields": {}, "summary": "意外险"}]
+    card = create_confirm(1, actions)
+    assert card.groups[0]["label"] == "其他"
+    assert card.groups[0]["items"] == ["意外险"]
