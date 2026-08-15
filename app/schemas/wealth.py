@@ -20,6 +20,7 @@ class CashflowBlock(BaseModel):
     expense: float = 0.0         # 月支出（含月供）
     surplus: float = 0.0         # 月结余
     savings_rate: float | None = None
+    breakdown: dict = Field(default_factory=dict)   # {incomes:[{category,amount}], expenses:[{category,amount,kind}]}
 
 
 class LiquidityBlock(BaseModel):
@@ -31,6 +32,7 @@ class DebtBlock(BaseModel):
     total_debt: float = 0.0
     monthly_payment: float = 0.0
     dti: float | None = None     # 月供 / 月收入
+    items: list[dict] = Field(default_factory=list)   # 逐笔负债明细（利率/剩余期限/月供/本金）
 
 
 class ProtectionBlock(BaseModel):
@@ -38,6 +40,7 @@ class ProtectionBlock(BaseModel):
     total_coverage: float = 0.0
     total_premium: float = 0.0
     coverage_ratio: float | None = None   # 保额 / 年收入
+    members: list[dict] = Field(default_factory=list)   # 按成员归组 {name,relation,coverage,premium,policy_count}
 
 
 class RetirementBlock(BaseModel):

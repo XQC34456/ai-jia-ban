@@ -21,6 +21,38 @@ KNOWN_LIMITATIONS = {
     ],
 }
 
+# 现金流「固定/弹性」分类关键字（纯展示分类，不改变任何金额，非财富计算）。
+_FIXED_KEYWORDS = ("贷", "租", "物业", "保险", "学费", "教育", "社保", "养老",
+                   "水电", "燃气", "通信", "话费", "宽带", "月供")
+
+
+def _expense_kind(category: str) -> str:
+    """支出分类：固定/弹性。关键字映射的展示口径，非财务事实。"""
+    return "fixed" if any(k in (category or "") for k in _FIXED_KEYWORDS) else "elastic"
+
+
+def _cashflow_breakdown(cashflows: list[dict]) -> dict:
+    """现金流明细：按 category 分组 + 年→月归一化（复用 Engine metrics._monthly 口径）。
+
+    只做「分组 + 归一化 + 展示分类」，金额零新增、零改写，数字仍来自 Engine 口径。
+    """
+    incomes: dict[str, float] = {}
+    expenses: dict[str, float] = {}
+    for c in cashflows:
+        amt = metrics._monthly(float(c.get("amount") or 0), c.get("period", "月"))
+        cat = c.get("category") or "其他"
+        bucket = incomes if c.get("flow_type") == "income" else expenses
+        bucket[cat] = bucket.get(cat, 0) + amt
+    exp_list = [{"category": k, "amount": round(v, 2), "kind": _expense_kind(k)}
+                for k, v in expenses.items()]
+    return {
+        "incomes": [{"category": k, "amount": round(v, 2)} for k, v in incomes.items()],
+        "expenses": exp_list,
+        # 固定/弹性总额在后端算好，前端只读、不自行求和。
+        "fixed_total": round(sum(x["amount"] for x in exp_list if x["kind"] == "fixed"), 2),
+        "elastic_total": round(sum(x["amount"] for x in exp_list if x["kind"] == "elastic"), 2),
+    }
+
 
 def build_overview(family_data: dict) -> dict:
     """返回家庭财富驾驶舱的完整 JSON Contract（Overview 形状）。"""
@@ -61,6 +93,7 @@ def build_overview(family_data: dict) -> dict:
             "expense": snap["monthly_expense"],
             "surplus": snap["monthly_surplus"],
             "savings_rate": snap["savings_rate"],
+            "breakdown": _cashflow_breakdown(cashflows),
         },
         "liquidity": {
             "liquid_assets": liquid,
@@ -71,9 +104,18 @@ def build_overview(family_data: dict) -> dict:
             "monthly_payment": round(
                 sum(float(l.get("monthly_payment") or 0) for l in liabilities), 2),
             "dti": metrics.debt_to_income(liabilities, cashflows),
+            "items": [
+                {"type": l.get("type"), "name": l.get("name"),
+                 "principal": float(l.get("principal") or 0),
+                 "monthly_payment": float(l.get("monthly_payment") or 0),
+                 "interest_rate": l.get("interest_rate"),
+                 "remaining_months": l.get("remaining_months")}
+                for l in liabilities
+            ],
         },
 
-        "protection": _protection(family_data.get("insurance", []), cashflows),
+        "protection": _protection(family_data.get("insurance", []), cashflows,
+                                  family_data.get("persons", [])),
 
         "goals": build_goals(family_data),
         "retirement": _retirement_block(rfr),
@@ -85,17 +127,37 @@ def build_overview(family_data: dict) -> dict:
     }
 
 
-def _protection(insurance: list[dict], cashflows: list[dict]) -> dict:
-    """保障块：保险作为风险转移独立呈现，不算投资资产。"""
+def _protection(insurance: list[dict], cashflows: list[dict], persons: list[dict]) -> dict:
+    """保障块：保险作为风险转移独立呈现，不算投资资产。members 按成员归组（join person）。"""
     total_coverage = sum(float(i.get("coverage") or 0) for i in insurance)
     total_premium = sum(float(i.get("annual_premium") or 0) for i in insurance)
     annual_income = metrics.monthly_income(cashflows) * 12
     ratio = total_coverage / annual_income if annual_income > 0 else None
+
+    by_person: dict[int | None, dict] = {}
+    for i in insurance:
+        pid = i.get("person_id")
+        g = by_person.setdefault(pid, {"coverage": 0.0, "premium": 0.0, "count": 0})
+        g["coverage"] += float(i.get("coverage") or 0)
+        g["premium"] += float(i.get("annual_premium") or 0)
+        g["count"] += 1
+    person_map = {p.get("id"): p for p in persons if p.get("id") is not None}
+    members = []
+    for pid, v in by_person.items():
+        p = person_map.get(pid)
+        members.append({
+            "name": (p.get("name") if p else None) or "家庭/未指定",
+            "relation": (p.get("relation") if p else None) or "",
+            "coverage": round(v["coverage"], 2),
+            "premium": round(v["premium"], 2),
+            "policy_count": v["count"],
+        })
     return {
         "insurance_count": len(insurance),
         "total_coverage": round(total_coverage, 2),
         "total_premium": round(total_premium, 2),
         "coverage_ratio": round(ratio, 3) if ratio is not None else None,
+        "members": members,
     }
 
 

@@ -3,7 +3,7 @@
 import { store, ensureOverview } from '../store.js';
 import { navigate } from '../router.js';
 import { fmtMoney, fmtPct } from '../format.js';
-import { HealthRadar, CashflowChart, DebtGauge, ProtectionGap } from '../charts.js';
+import { HealthRadar, CashflowChart, CashflowBreakdown, DebtGauge, DebtDetail, ProtectionGap, ProtectionMembers } from '../charts.js';
 
 const { onMounted, computed } = Vue;
 
@@ -13,7 +13,7 @@ const DIM_LABELS = {
 };
 
 export const HealthView = {
-  components: { HealthRadar, CashflowChart, DebtGauge, ProtectionGap },
+  components: { HealthRadar, CashflowChart, CashflowBreakdown, DebtGauge, DebtDetail, ProtectionGap, ProtectionMembers },
   setup() {
     onMounted(() => { ensureOverview().catch(() => {}); });
 
@@ -22,6 +22,16 @@ export const HealthView = {
     // 维度明细：最弱的排前面，一眼看到「哪维最弱」。
     const dimsSorted = computed(() => [...dims.value].sort((a, b) => (a.score ?? 0) - (b.score ?? 0)));
     const weakCount = computed(() => dims.value.filter(d => d.score < 60).length);
+    // 瀑布图数据：只读后端算好的固定/弹性总额，前端零求和。
+    const cashflowBreakdown = computed(() => {
+      const b = (o.value && o.value.cashflow && o.value.cashflow.breakdown) || {};
+      return {
+        income: o.value && o.value.cashflow ? o.value.cashflow.income : 0,
+        fixed: b.fixed_total,
+        elastic: b.elastic_total,
+        surplus: o.value && o.value.cashflow ? o.value.cashflow.surplus : 0,
+      };
+    });
 
     function dimLabel(name) { return DIM_LABELS[name] || name; }
     function scoreTone(s) { return s >= 80 ? 'pos' : s >= 60 ? 'warn' : 'neg'; }
@@ -30,7 +40,7 @@ export const HealthView = {
     function goChat() { navigate('chat'); }
 
     return {
-      store, o, dims, dimsSorted, weakCount,
+      store, o, dims, dimsSorted, weakCount, cashflowBreakdown,
       dimLabel, scoreTone, scoreColor, ratioText, goChat,
       fmtMoney, fmtPct,
     };
@@ -81,6 +91,7 @@ export const HealthView = {
         <section class="panel">
           <div class="card-title">现金流 · 钱去哪了？</div>
           <cashflow-chart :data="o.cashflow" />
+          <cashflow-breakdown :data="cashflowBreakdown" />
           <div class="kv-grid">
             <div class="kv"><span>月收入</span><b>{{ fmtMoney(o.cashflow.income) }}</b></div>
             <div class="kv"><span>月支出</span><b>{{ fmtMoney(o.cashflow.expense) }}</b></div>
@@ -94,6 +105,7 @@ export const HealthView = {
         <section class="panel">
           <div class="card-title">负债 · 债务危险吗？</div>
           <debt-gauge :data="o.debt" />
+          <debt-detail v-if="o.debt.items && o.debt.items.length" :data="o.debt.items" />
           <div class="kv-grid">
             <div class="kv"><span>总负债</span><b>{{ fmtMoney(o.debt.total_debt) }}</b></div>
             <div class="kv"><span>月供</span><b>{{ fmtMoney(o.debt.monthly_payment) }}</b></div>
@@ -106,6 +118,7 @@ export const HealthView = {
         <section class="panel">
           <div class="card-title">保障 · 出事扛不扛得住？</div>
           <protection-gap :data="o.protection" />
+          <protection-members v-if="o.protection.members && o.protection.members.length" :data="o.protection.members" />
           <div class="kv-grid">
             <div class="kv"><span>保险份数</span><b>{{ o.protection.insurance_count }} 份</b></div>
             <div class="kv"><span>总保额</span><b>{{ fmtMoney(o.protection.total_coverage) }}</b></div>

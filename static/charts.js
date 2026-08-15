@@ -183,3 +183,114 @@ export const RetirementGap = defineChart((data) => {
     }],
   };
 });
+
+// —— ⑧ 现金流固定/弹性瀑布图：回答「钱怎么从收入流到结余的？固定 vs 弹性各花多少？」 ——
+// 只读后端算好的确定性数字 {income, fixed, elastic, surplus}（固定/弹性总额后端已求和），零计算。
+export const CashflowBreakdown = defineChart((data) => {
+  const d = data || {};
+  if (!d.income && !d.fixed && !d.elastic) return null;
+  const income = d.income ?? 0;
+  const fixed = d.fixed ?? 0;
+  const elastic = d.elastic ?? 0;
+  const surplus = d.surplus ?? 0;
+  const cats = ['月收入', '固定支出', '弹性支出', '月结余'];
+  // 瀑布：透明基座承载「累计起点」，可见柱高度 = |增量|，柱顶即累计值。
+  const base = [0, income - fixed, income - fixed - elastic, 0];
+  const heights = [income, fixed, elastic, surplus];
+  const colors = ['#34c759', '#ff9500', '#5ac8fa', surplus >= 0 ? '#007aff' : '#ff3b30'];
+  const signed = [income, -fixed, -elastic, surplus];
+  return {
+    tooltip: {
+      trigger: 'axis', axisPointer: { type: 'shadow' },
+      formatter: (params) => {
+        const p = (params || []).find(x => x.seriesName === 'value');
+        return p ? `${cats[p.dataIndex]}：${fmtMoney(signed[p.dataIndex])}` : '';
+      },
+    },
+    grid: { left: 8, right: 8, top: 24, bottom: 4, containLabel: true },
+    xAxis: { type: 'category', data: cats, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: { type: 'value', splitLine: { lineStyle: { color: '#eceef1' } }, axisLabel: { formatter: (v) => fmtMoney(v) } },
+    series: [
+      { name: 'base', type: 'bar', stack: 'total', silent: true, itemStyle: { color: 'transparent' }, data: base },
+      { name: 'value', type: 'bar', stack: 'total', barWidth: 40,
+        data: heights.map((h, i) => ({ value: h, itemStyle: { color: colors[i] } })) },
+    ],
+  };
+});
+
+// 利率展示归一化：后端透传原始值（可能是 3.5 百分数，也可能是 0.035 小数），
+// 与 Engine _rate 口径一致（>1 视为百分数），只做展示格式化，非财富计算。
+function ratePct(v) {
+  if (v == null) return null;
+  const r = Number(v);
+  const pct = r > 1 ? r : r * 100;
+  return pct.toFixed(2) + '%';
+}
+
+// —— ⑨ 负债明细图：回答「每笔债还剩多少本金？利率多少？还要还多久？」 ——
+// 只读 debt.items（逐笔透传的已有字段），零计算。
+export const DebtDetail = defineChart((data) => {
+  const items = data || [];
+  if (!items.length) return null;
+  const names = items.map(l => l.name || l.type || '负债');
+  const values = items.map(l => l.principal || 0);
+  const labels = items.map(l => {
+    const rate = ratePct(l.interest_rate) || '';
+    const term = l.remaining_months != null ? l.remaining_months + '月' : '';
+    return [rate, term].filter(Boolean).join(' · ') || '—';
+  });
+  return {
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params) => {
+        const p = (params || [])[0];
+        const l = items[p.dataIndex];
+        const rate = ratePct(l.interest_rate) || '—';
+        const term = l.remaining_months != null ? l.remaining_months + '月' : '—';
+        const pay = l.monthly_payment != null ? fmtMoney(l.monthly_payment) : '—';
+        return `${l.name || l.type || '负债'}<br/>剩余本金：${fmtMoney(l.principal || 0)}<br/>利率：${rate} · 剩余期限：${term}<br/>月供：${pay}`;
+      },
+    },
+    grid: { left: 8, right: 96, top: 8, bottom: 4, containLabel: true },
+    xAxis: { type: 'value', splitLine: { lineStyle: { color: '#eceef1' } }, axisLabel: { formatter: (v) => fmtMoney(v) } },
+    yAxis: { type: 'category', data: names, axisLabel: { width: 84, overflow: 'truncate' } },
+    series: [{
+      type: 'bar', barWidth: 16, data: values,
+      itemStyle: { color: '#ff9500', borderRadius: 8 },
+      label: { show: true, position: 'right', formatter: (p) => labels[p.dataIndex] },
+    }],
+  };
+});
+
+// —— ⑩ 保障成员覆盖图：回答「谁有保障？每个人保额/保费/保单数各多少？」 ——
+// 只读 protection.members（后端按成员归组好的确定性数字），零计算。
+export const ProtectionMembers = defineChart((data) => {
+  const members = data || [];
+  if (!members.length) return null;
+  const names = members.map(m => m.name || '未指定');
+  const values = members.map(m => m.coverage || 0);
+  const labels = members.map(m => {
+    const parts = [];
+    if (m.relation) parts.push(m.relation);
+    parts.push((m.policy_count || 0) + ' 份');
+    return parts.join(' · ');
+  });
+  return {
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params) => {
+        const p = (params || [])[0];
+        const m = members[p.dataIndex];
+        return `${m.name || '未指定'}<br/>保额：${fmtMoney(m.coverage || 0)}<br/>年保费：${fmtMoney(m.premium || 0)}<br/>保单：${m.policy_count || 0} 份`;
+      },
+    },
+    grid: { left: 8, right: 96, top: 8, bottom: 4, containLabel: true },
+    xAxis: { type: 'value', splitLine: { lineStyle: { color: '#eceef1' } }, axisLabel: { formatter: (v) => fmtMoney(v) } },
+    yAxis: { type: 'category', data: names, axisLabel: { width: 84, overflow: 'truncate' } },
+    series: [{
+      type: 'bar', barWidth: 16, data: values,
+      itemStyle: { color: '#5ac8fa', borderRadius: 8 },
+      label: { show: true, position: 'right', formatter: (p) => labels[p.dataIndex] },
+    }],
+  };
+});
