@@ -1,6 +1,9 @@
 # AdvisorContext 契约设计（Phase 1b · Step 2）
 
-> **状态：设计稿，待确认。未实现。**
+> **状态：已实现（2026-08-15）。** 契约 schema、converse 入口消费、前端各页写结构化 context、
+> chat.js 带 context、G3 存原 query 均落地；T1–T6 契约测试已冻结为 [test_advisor_context.py](../tests/test_advisor_context.py)
+> 并转绿，确定性 12 题基线 17 锚不倒退。真实 LLM 路径（advisor_path）对 context 的深层消费
+> 留待 Step 3「重构跨页面问顾问」。
 > 依据：12 题基准 [report_benchmark12.md](../advisor_eval/report_benchmark12.md)（G1/G3/#8 实证）+ 现状核对 [verification-v10-current-state.md](verification-v10-current-state.md)（论断 #8）+ 架构主纲 [plan-ai-advisor-core-architecture.md](plan-ai-advisor-core-architecture.md) §5。
 > 本设计回答：**Context 到底是什么、从哪来、被谁消费、优先级如何、如何用契约解掉 G1/G3/#8。**
 

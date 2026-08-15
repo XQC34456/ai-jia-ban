@@ -77,10 +77,21 @@ def looks_like_filing(message: str) -> bool:
     return not _QUESTION_RE.search(message)
 
 
-def create_confirm(family_id: int, actions: list[dict[str, Any]]) -> ConfirmCard:
-    """把抽取到的动作暂存为 pending，返回确认卡片；未确认前不写库。"""
+def create_confirm(family_id: int, actions: list[dict[str, Any]],
+                   original_query: str | None = None,
+                   advisor_context=None) -> ConfirmCard:
+    """把抽取到的动作暂存为 pending，返回确认卡片；未确认前不写库。
+
+    Phase 1b G3：随卡存 original_query（用户原话）与 advisor_context（解析后 ctx），
+    取消后原问题不丢——可重新投入回答路径（「取消建档后继续回答」，Phase 1c 落地）。
+    """
     pending_id = uuid.uuid4().hex
-    _PENDING[pending_id] = {"family_id": family_id, "actions": actions}
+    _PENDING[pending_id] = {
+        "family_id": family_id,
+        "actions": actions,
+        "original_query": original_query,
+        "advisor_context": advisor_context,
+    }
     groups: list[dict[str, Any]] = []
     for a in actions:
         label, icon = _KIND_META.get(a["kind"], ("其他", "⚪"))
@@ -103,7 +114,8 @@ def apply_confirmation(family_id: int, pending_id: str, confirmed: bool) -> Appl
     if pending is None or pending["family_id"] != family_id:
         return AppliedResponse(type="error", message="该确认已失效，请重新输入。")
     if not confirmed:
-        return AppliedResponse(type="discarded", message="好的，已忽略，没有改动你的档案。")
+        return AppliedResponse(type="discarded", message="好的，已忽略，没有改动你的档案。",
+                               original_query=pending.get("original_query"))
     for action in pending["actions"]:
         db.apply_action(family_id, action)
         # 顾问知识类事实（目标）写记忆层：版本化记录目标历史，检测目标变化。

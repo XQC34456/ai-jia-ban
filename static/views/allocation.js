@@ -56,7 +56,16 @@ export const AllocationView = {
     function tgtPct(k) { return target.value[k]; }
     function devLabel(k) { const d = deviation.value; return (d && d[k]) ? (DEV_LABELS[d[k]] || d[k]) : null; }
     function devTone(k) { const d = deviation.value; return (d && d[k]) ? (DEV_TONE[d[k]] || '') : ''; }
-    function goChat() { navigate('chat'); }
+    function goChat() {
+      // Phase 1b：结构化上下文（配置页 → 顾问），配置指标由 Engine 重算，payload 不塞数字。
+      store.chat.draft = '为什么这么配置？';
+      store.chat.advisorContext = {
+        source: 'allocation',
+        intent_hint: 'CHECK_ALLOCATION',
+        payload: {},
+      };
+      navigate('chat');
+    }
 
     return {
       store, o, classes, target, concentration, fitness, liquidity,

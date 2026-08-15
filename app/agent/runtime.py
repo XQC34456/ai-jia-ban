@@ -42,8 +42,13 @@ _DISAMBIGUATE_SUMMARY = (
 
 def handle(message: str, user: dict, llm: LLMProvider | None = None,
            context: dict | None = None, wealth_context: str | None = None,
-           memory_context: str | None = None) -> AgentResponse:
-    """编排一次完整交互：拒算门 → 意图路由 → 参数提取 → 工具分派 → 组装响应。"""
+           memory_context: str | None = None,
+           advisor_ctx=None) -> AgentResponse:
+    """编排一次完整交互：拒算门 → 意图路由 → 参数提取 → 工具分派 → 组装响应。
+
+    advisor_ctx（Phase 1b 解析层 AdvisorContext，entry 入口构建）携带页面 intent_hint
+    进入路由（SEED 非 OVERRIDE），供缺数检测底座取用。缺省 None 时行为与改造前一致。
+    """
     # ① 拒算门（优先于普通意图路由）
     refusal = refusal_gate(message)
     if refusal is not None:
@@ -60,8 +65,12 @@ def handle(message: str, user: dict, llm: LLMProvider | None = None,
         intent = "SCENARIO_COMPARE"
         hint = refusal["scenario"]
     else:
+        # 页面 intent_hint 只作 SEED：关键词强路由优先（用户当前 query 压倒 hint），
+        # hint 仅在关键词未命中时、于 LLM 兜底之前生效（见 route_intent）。
+        intent_hint = (advisor_ctx.request.intent_hint
+                       if advisor_ctx is not None else None)
         intent = route_intent(message, llm, wealth_context=wealth_context,
-                              memory_context=memory_context)
+                              memory_context=memory_context, intent_hint=intent_hint)
         hint = None
 
     # ② advisor_path：所有意图（含 EXPLAIN_RESULT）先走顾问式 tool_loop（LLM 为插件）。

@@ -203,8 +203,14 @@ export const SandboxView = {
       catch (e) { planError.value = e.message || '采纳失败'; }
     }
     function askAdvisor(optId, summary) {
-      store.chat.draft = '我模拟了「' + SCENARIOS[st.scenario].label + '」方案 ' + optId
-        + '：' + summary + '。这对我的家庭财务意味着什么？你怎么看？';
+      // Phase 1b：结构化上下文携带情景标识（scenario_name），方案影响由 Engine 重算；
+      // 不再把方案摘要/差值数字塞进预填问题（T4：页面数字永不进 Advisor 输出）。
+      store.chat.draft = '我模拟的这个方案对我的家庭财务意味着什么？';
+      store.chat.advisorContext = {
+        source: 'sandbox',
+        intent_hint: 'SCENARIO_COMPARE',
+        payload: { scenario_name: st.scenario },
+      };
       navigate('chat');
     }
 

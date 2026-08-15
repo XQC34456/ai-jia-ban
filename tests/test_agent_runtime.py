@@ -274,7 +274,8 @@ def test_handle_passes_memory_context_to_router(client, auth_headers, monkeypatc
     """runtime 层：handle 确实把 memory_context 透传给 route_intent（防「router 支持但 runtime 忘传」）。"""
     captured = {}
 
-    def _spy_route(message, llm=None, wealth_context=None, memory_context=None):
+    def _spy_route(message, llm=None, wealth_context=None, memory_context=None,
+                   intent_hint=None):
         captured["memory_context"] = memory_context
         return "CHECK_RETIREMENT"
 

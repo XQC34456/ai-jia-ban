@@ -3,7 +3,7 @@
 import { store, ensureOverview } from '../store.js';
 import { RetirementCard } from './cards.js';
 import { RetirementGap } from '../charts.js';
-import { LIMITATION_LABELS, fmtMoney } from '../format.js';
+import { LIMITATION_LABELS } from '../format.js';
 import { navigate } from '../router.js';
 
 const { onMounted, computed } = Vue;
@@ -19,13 +19,15 @@ export const RetirementView = {
     });
     function limitationLabel(k) { return LIMITATION_LABELS[k] || k; }
 
-    // P1 决策闭环出口：看完退休缺口 → 问顾问怎么办。数字只读后端 retirement 块，零计算。
+    // P1 决策闭环出口：看完退休缺口 → 问顾问怎么办。Phase 1b 改结构化上下文：
+    //   数字（RFR/NWC/缺口）由 Engine 重算，绝不塞进 payload 或预填问题（T4）。
     function askAdvisor() {
-      const r = store.overview && store.overview.retirement;
-      const inv = r ? fmtMoney(r.investable_at_retirement) : '—';
-      const need = r ? fmtMoney(r.retirement_need_pv) : '—';
-      store.chat.draft = '我的退休准备缺口怎么补？当前退休可投资资产 ' + inv
-        + '，退休需求现值 ' + need + '，请帮我看看怎么办。';
+      store.chat.draft = '我的退休准备够不够？';
+      store.chat.advisorContext = {
+        source: 'retirement',
+        intent_hint: 'CHECK_RETIREMENT',
+        payload: {},
+      };
       navigate('chat');
     }
 

@@ -16,11 +16,16 @@ export const GoalsView = {
 
     const goals = computed(() => (store.goals.data && store.goals.data.goals) || []);
 
-    // P1 决策闭环出口：看完目标 → 问顾问怎么办。预填问题只组织后端既有数字，零计算。
+    // P1 决策闭环出口：看完目标 → 问顾问怎么办。Phase 1b 改结构化上下文：
+    //   payload 只带标识（goal_id/goal_type），缺口/每月需存等数字由 Engine 重算（T4），
+    //   绝不把页面聚合数字塞进 payload 或预填问题（避免第二条计算源 / 编造风险）。
     function askAdvisor(g) {
-      store.chat.draft = '我的目标「' + g.name + '」（' + g.type + '）目标金额 '
-        + fmtMoney(g.target_amount) + '，已备 ' + fmtMoney(g.current_saved) + '，缺口 '
-        + fmtMoney(g.gap) + '，每月需存 ' + fmtMoney(g.monthly_needed) + '，请帮我看看怎么完成最稳。';
+      store.chat.draft = '这个目标怎么完成？';
+      store.chat.advisorContext = {
+        source: 'goals',
+        intent_hint: 'CHECK_GOALS',
+        payload: { goal_id: g.goal_id, goal_type: g.type },
+      };
       navigate('chat');
     }
 

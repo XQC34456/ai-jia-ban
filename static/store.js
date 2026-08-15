@@ -30,7 +30,9 @@ export const store = reactive({
 
   // —— 切片：AI 顾问对话（Phase 4 迁移 vanilla chat 后启用）——
   // draft：跨视图「问顾问」一次性预填信号（Goals/Retirement/Sandbox 写入、chat setup 读取后清空），仅前端状态，不落库。
-  chat: { messages: [], loading: false, error: null, draft: null },
+  // advisorContext：跨视图「问顾问」结构化上下文（Phase 1b，来源页写入、chat 发送首条时消费并清空），
+  //   只带标识 + 意图建议，绝不含聚合数字（gap/score/dti…由 Engine 重算，T4 硬红线）。
+  chat: { messages: [], loading: false, error: null, draft: null, advisorContext: null },
 
   // —— 切片：家庭数据（Phase 6A 可编辑闭环：读 /api/family，写 entity CRUD）——
   family: { data: null, loading: false, error: null, saving: false },
@@ -71,6 +73,8 @@ export function logout() {
   store.sandbox.result = null;
   store.sandbox.comparison = null;
   store.chat.messages = [];
+  store.chat.draft = null;
+  store.chat.advisorContext = null;
   store.family.data = null;
   store.review.data = null;
   store.actionPlan.data = null;

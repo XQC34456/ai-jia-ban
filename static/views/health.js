@@ -37,7 +37,15 @@ export const HealthView = {
     function scoreTone(s) { return s >= 80 ? 'pos' : s >= 60 ? 'warn' : 'neg'; }
     function scoreColor(s) { return s >= 80 ? '#34c759' : s >= 60 ? '#ffcc00' : '#ff3b30'; }
     function ratioText(r) { return r == null ? '—' : Number(r).toFixed(1) + ' 倍'; }
-    function goChat() { navigate('chat'); }
+    function goChat() {
+      // Phase 1b：健康体检页 → 顾问（overview 来源），指标由 Engine 重算，payload 不塞数字。
+      store.chat.advisorContext = {
+        source: 'overview',
+        intent_hint: 'CHECK_ISSUES',
+        payload: {},
+      };
+      navigate('chat');
+    }
 
     return {
       store, o, dims, dimsSorted, weakCount, cashflowBreakdown,

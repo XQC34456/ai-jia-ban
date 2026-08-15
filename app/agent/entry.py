@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from .. import db
 from ..schemas.agent import AgentResponse, ConfirmCard
+from ..schemas.context import QUESTION_SOURCES, AdvisorContext, build_advisor_context
 from .context import build_wealth_context, context_to_text
 from .layers import attach_layers
 from .memory import build_memory_context, detect_invalidation, record_turn
@@ -25,31 +26,41 @@ _FILING_CLARIFY_SUMMARY = (
 
 def converse(message: str, user: dict, llm: LLMProvider | None = None,
              context: dict | None = None) -> ConfirmCard | AgentResponse:
-    """先抽取建档动作：命中则返回确认卡片；否则交给七意图 Agent。
+    """先建 AdvisorContext（Phase 1b），再按建档判定走确认卡 / 明确追问 / 七意图。
 
-    V27.1 三级：抽取命中 → 确认卡；抽空但像建档 → need_clarification 明确追问；
+    Phase 1b 重构（G1）：提问面来源（goals/retirement/allocation/sandbox/overview）
+    天然按提问处理，建档判定不参与（见本函数主体注释）。source=chat（含无 context）
+    保留原三级：抽取命中 → 确认卡；抽空但像建档 → need_clarification 明确追问；
     否则 → 七意图 Agent。user 需含 family_id（tier 供 SCENARIO_COMPARE 的 VIP 门）。
 
     内测观察期埋点：每条用户消息 → 一条 intent_asked（记「最终路由后」的 intent，
     建档路径记 filing）；失效触发 → 一条 stale_detected。只记事实，不参与财富计算。
     """
     family_id = user["family_id"]
-    actions = extract_actions(message, llm=llm)
-    if actions:
-        db.record_event(family_id, "intent_asked", intent="filing")
-        return create_confirm(family_id, actions)
-    if looks_like_filing(message):
-        db.record_event(family_id, "intent_asked", intent="filing",
-                        meta={"status": "need_clarification"})
-        return build_response("EXPLAIN_RESULT", "need_clarification", None,
-                              summary=_FILING_CLARIFY_SUMMARY)
+    # Context 阶段（先于 intent）：构建解析层 AdvisorContext（request 归一 + family_state）。
+    # 数字只由系统确定性写入；payload 白名单剥离禁止字段（T6）；query 缺省回退 message（G3）。
+    advisor_ctx = build_advisor_context(message, user, context)
+    # G1 解法（设计 §3）：提问面来源（goals/retirement/allocation/sandbox/overview）天然是
+    # 「提问」——source 是构造事实，建档判定不参与意图。source=chat 保留现状建档判定，
+    # 只作「非情景词 + 非问句 + 有金额」时的兜底，不再抢先覆盖回答。
+    if advisor_ctx.request.source not in QUESTION_SOURCES:
+        actions = extract_actions(message, llm=llm)
+        if actions:
+            db.record_event(family_id, "intent_asked", intent="filing")
+            return create_confirm(family_id, actions, original_query=message,
+                                  advisor_context=advisor_ctx)
+        if looks_like_filing(message):
+            db.record_event(family_id, "intent_asked", intent="filing",
+                            meta={"status": "need_clarification"})
+            return build_response("EXPLAIN_RESULT", "need_clarification", None,
+                                  summary=_FILING_CLARIFY_SUMMARY)
     wealth_context = _wealth_context_text(user)
     invalidation = detect_invalidation(family_id)   # 先确定性失效检测（标记 stale）
     if invalidation:
         db.record_event(family_id, "stale_detected", meta={"count": len(invalidation)})
     memory_context = build_memory_context(family_id, invalidation=invalidation)
     result = handle(message, user, llm=llm, context=context, wealth_context=wealth_context,
-                    memory_context=memory_context)
+                    memory_context=memory_context, advisor_ctx=advisor_ctx)
     if isinstance(result, AgentResponse):
         result = attach_layers(result, family_id, invalidation)
         db.record_event(family_id, "intent_asked", intent=result.intent,

@@ -159,12 +159,17 @@ export const ChatView = {
     async function send() {
       const text = input.value.trim();
       if (!text || sending.value) return;
+      // Phase 1b：跨页「问顾问」结构化上下文随首条消息发送，一次性消费（与 draft 同生命周期）。
+      const advisorCtx = store.chat.advisorContext;
+      store.chat.advisorContext = null;
       input.value = '';
       store.chat.messages.push({ who: 'user', text });
       sending.value = true; chatError.value = '';
       scrollChat();
       try {
-        const d = await api('/api/agent/chat', { method: 'POST', body: { message: text }, token: store.auth.token });
+        const body = { message: text };
+        if (advisorCtx) body.context = advisorCtx;
+        const d = await api('/api/agent/chat', { method: 'POST', body, token: store.auth.token });
         if (d.type === 'confirm') {
           store.chat.messages.push({ type: 'confirm', pendingId: d.pending_id, message: d.message, items: d.items, groups: d.groups || [], resolved: false });
         } else {

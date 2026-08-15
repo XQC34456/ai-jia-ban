@@ -54,8 +54,13 @@ def refusal_gate(message: str) -> dict | None:
 
 def route_intent(message: str, llm: LLMProvider | None = None,
                  wealth_context: str | None = None,
-                 memory_context: str | None = None) -> str:
-    """确定性关键词 → LLM 兜底 → Literal 七意图校验 → 兜底 VIEW_OVERVIEW。
+                 memory_context: str | None = None,
+                 intent_hint: str | None = None) -> str:
+    """确定性关键词 → 页面 intent_hint（SEED）→ LLM 兜底 → Literal 校验 → 兜底 Overview。
+
+    Phase 1b：intent_hint（页面建议意图）只作 SEED，不是 OVERRIDE——关键词强路由
+    （用户当前 query）永远优先；hint 仅在 query 未命中关键词时、于 LLM 兜底之前生效，
+    帮 Advisor 缩小搜索空间，不压用户最新问题（设计 §3 优先级）。
 
     wealth_context 仅在 LLM 兜底注入（关键词命中的确定性路径不注入；意图分类输出
     是枚举、非数字，注入背景可消歧、无编造风险）。memory_context（近期对话）同样
@@ -64,6 +69,8 @@ def route_intent(message: str, llm: LLMProvider | None = None,
     for intent, words in _INTENT_KEYWORDS:
         if any(w in message for w in words):
             return intent
+    if intent_hint in AGENT_INTENTS:
+        return intent_hint
     if llm is not None:
         user_prompt = message
         if memory_context:

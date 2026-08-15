@@ -168,7 +168,11 @@ class AgentResponse(BaseModel):
 
 
 class AgentRequest(BaseModel):
-    """Agent 自然语言请求体。message 必填（1~2000 字），context 供 EXPLAIN_RESULT 复用。"""
+    """Agent 自然语言请求体。message 必填（1~2000 字）。
+
+    context（AdvisorContextRequest 结构，Phase 1b 起为第一等输入）：跨页面「问顾问」
+    携带 source/intent_hint/payload 等，converse() 入口构建解析层并进入决策链；
+    缺省 None → 按普通 chat 处理（source="chat"）。"""
     message: str = Field(min_length=1, max_length=2000)
     context: dict | None = None
 
@@ -185,6 +189,10 @@ class ConfirmCard(BaseModel):
 
 
 class AppliedResponse(BaseModel):
-    """建档确认落地结果。type ∈ applied / discarded / error。"""
+    """建档确认落地结果。type ∈ applied / discarded / error。
+
+    original_query：确认卡当时携带的原问题（Phase 1b G3）——取消后原问题不丢，
+    随响应返回供「继续回答」重新投入回答路径。"""
     type: Literal["applied", "discarded", "error"]
     message: str
+    original_query: str | None = None
