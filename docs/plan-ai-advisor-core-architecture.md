@@ -1,7 +1,7 @@
 # Plan D — AI Advisor V2（主体计划）
 
 > 唯一主体计划。**AI 顾问 = 产品主入口、决策中枢；其余所有模块（Engine / Decision / Cockpit / X-Ray / Sandbox / Data / Goals / Reports / Reminders）都是顾问的能力底座和行动工具。**
-> 依据 [advisor-architecture-audit.md](advisor-architecture-audit.md) + [plan-master-roadmap.md](plan-master-roadmap.md) §4。
+> 依据 [archive/advisor-architecture-audit.md](archive/advisor-architecture-audit.md) + [plan-master-roadmap.md](plan-master-roadmap.md) §4。
 > V2.1→V2.6 每阶段的**分阶段 plan 挂在本文之下**，不再散落独立文件。
 
 ---

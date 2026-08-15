@@ -56,8 +56,10 @@
 | C5 | 统一 App Shell（8 视图） | ✅ |
 | C6 | AI 顾问统一收口（建档吸收 + 七意图 + 确定性产出） | ✅ 冻结 `f227c95` |
 | 4.1 展示层 | 体检横幅 / 为什么 / 下一步按钮 / 沙盘模式提示 / 冷启动向导 | ✅ 5 commit |
+| **P1 联动** | Advisor×Engine×Chart×Action：确定性基线 → 情景证据图 → 结构化追问 → 建议采纳闭环 | ✅ 516 pytest |
+| **P2 内测** | 埋点（8 类事件）→ P2-A 价值前置（Free→VIP 先基础判断再边界） | ✅ 539 pytest |
 
-- 测试：**pytest 428 passed · node 12 passed**
+- 测试：**pytest 539 passed · node 12 passed**
 - **冻结契约**：A1–A4、Wealth Engine、Decision、API Schema、Agent Runtime —— 后续阶段一律不修改。
 - **内测基线 + 暂缓清单**：见 [internal-beta-baseline.md](internal-beta-baseline.md)（内测阶段口径）。
 
@@ -67,7 +69,7 @@
 
 ## 4. 主体：Plan D — AI Wealth Advisor Core（唯一主线）
 
-> **审计结论（见 [advisor-architecture-audit.md](advisor-architecture-audit.md)）**：当前 AI 顾问是 Level 0，
+> **审计结论（见 [archive/advisor-architecture-audit.md](archive/advisor-architecture-audit.md)）**：当前 AI 顾问是 Level 0，
 > 骨架全对，缺「理解 / 上下文 / 记忆 / 对话」四个引擎。这不是文案问题，是最高优先级的产品问题。
 
 **主体定位**：AI 顾问 = 主产品。其余全是顾问的器官——
@@ -147,12 +149,29 @@ AI Gateway → 多 Provider → 缓存/限流/队列 → 数据库 → 长期记
 ```text
 【已冻结】 C3 → A1 → A2 → A3.1 → A3.2 → A4 → C5 → C6 → 4.1 展示层
 【主体】   Plan D = AI Advisor V2：V2.1(上下文) → V2.2(工具) → V2.3(大脑) → V2.4(记忆) → V2.5(主动) → V2.6(行动)
-【护栏】   H 评测贯穿 V2.1→V2.6
-【分支】   数据治理 → 服务 V2.1 ｜ 冷启动 → 服务 V2.1 ｜ 4.1 展示层 → 服务 V2.3 ｜ 沙盘 → V2.2/V2.6 底座 ｜ 4.1 收尾 → 等 V2.3/V2.4
+【P1 联动】 Advisor×Engine×Chart×Action：确定性基线 → 情景证据图 → 结构化追问 → 建议采纳闭环 ✅
+【P2 内测】 观察期：埋点 ✅ → P2-A 价值前置 ✅ → 观察 2~4 周 → P2-B 对标 → P2-C UI 复盘
+【后续】   C3 Wealth Sandbox → V2.5 主动提醒 → V2.6 行动闭环 → 正式版基础设施
+【护栏】   H 评测贯穿始终
 【闸门】   B1/B2 → 数据安全基线
 【测试版】 MVP → 真实用户 → 指标验收
 【正式版】 基础设施 → 商业化
 ```
+
+---
+
+## 11. 后续更新计划（当前排队）
+
+> 内测观察期：先让埋点跑 2~4 周，用真实用户行为决定下一步，不堆功能。
+
+| 顺序 | 计划 | 目标 | 触发条件 |
+|------|------|------|----------|
+| 1 | **P2-B** 对标 DeepSeek/豆包 | 固定 prompt + rubric 真实跑，落点「谁能给出可追溯数字」 | 埋点跑 2~4 周后有真实数据 |
+| 2 | **P2-C** UI 信息架构复盘 | 每个页面「数据→判断→图表→行动」闭环 | P2-B 之后 |
+| 3 | **C3** Wealth Sandbox | 情景沙盘能力底座 | P2 收口后 |
+| 4 | **V2.5** Proactive Advisor | 登录即主动提醒（需调度器） | 留存数据支撑 |
+| 5 | **V2.6** Action Loop | create_action 计划/提醒/复盘 | V2.5 之后 |
+| 6 | 正式版基础设施 | AI Gateway / 多 Provider / 缓存限流 / 商业化 | 测试版验证后 |
 
 ---
 
@@ -162,8 +181,8 @@ AI Gateway → 多 Provider → 缓存/限流/队列 → 数据库 → 长期记
 |------|------|
 | `plan-master-roadmap.md`（本文件） | **唯一总纲** |
 | `plan-ai-advisor-core-architecture.md` | **唯一主体计划**（Plan D，D0→D5 展开） |
-| `advisor-architecture-audit.md` | 审计输入（Level 0 → 5 依据，D0 成果） |
+| `archive/advisor-architecture-audit.md` | 审计输入（Level 0 → 5 依据，D0 成果） |
 | `spec-ux-humanization.md` | 人性化规范（分支 D3 的验收依据） |
 | `api-contract-v1.md` | 冻结契约参考 |
 | `testing-guide.md` | 测试入口 |
-| `docs/archive/` | 已完成的历史计划（12 个） |
+| `docs/archive/` | 已完成的历史计划（25 个） |

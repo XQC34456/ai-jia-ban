@@ -64,5 +64,5 @@ Hard failures          0
 ## §5 版本命名澄清
 
 - roadmap 的 **V2.5 = Proactive Advisor**（暂缓清单 #1，未做）。
-- 本次已归档的「V2.5 判断失效复盘」实际是 **H 评测护栏的一次评估层诊断**（P1 stale → evaluator bug），见 [v25-stale-invalidation-postmortem.md](v25-stale-invalidation-postmortem.md)，**不占产品阶段号**。
+- 本次已归档的「V2.5 判断失效复盘」实际是 **H 评测护栏的一次评估层诊断**（P1 stale → evaluator bug），见 [archive/v25-stale-invalidation-postmortem.md](archive/v25-stale-invalidation-postmortem.md)，**不占产品阶段号**。
 - 后续阶段号从 V2.5（Proactive）继续，不再与本次诊断撞名。
