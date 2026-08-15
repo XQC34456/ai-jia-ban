@@ -28,7 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app import db
-from app.agent.entry import converse
+from app.agent.entry import cancel_and_reanswer, converse
 from app.agent.profile import apply_confirmation
 from app.agent.provider import NullProvider
 from app.agent.providers import get_provider
@@ -111,15 +111,18 @@ BENCHMARK: list[dict] = [
      "expect": {"returned": "AgentResponse", "status": "ok",
                 "accepts": ["AgentResponse"]},
      "notes": "决策比较：期望引擎计算 + 权衡"},
-    # -- 取消建档继续回答（G3 主战场，两轮）--
+    # -- 取消建档继续回答（G3 主战场；Step 4 后 re-answer 为正常回答路径）--
     {"id": 10, "title": "取消建档后继续回答原问题",
-     "messages": ["我想把 30 万投入股票，应该怎么分？",
-                  "我不想建档了，你先回答我的问题"],
-     "family": "empty",
+     "messages": ["我月收入 3 万，存款 50 万，这 30 万怎么配置？"],
+     "family": "filed",
+     "reanswer_after_cancel": True,
      "expect": {"returned": "AgentResponse", "status": "ok",
                 "accepts": ["AgentResponse"], "gap": "G3 取消建档丢问题"},
-     "notes": "轮1 用「投入股票」措辞（非「投资」情景词）→ 现状弹确认卡（G1 吞问题）；"
-              "弹卡后自动模拟取消（cancel 记录）；轮2 取消+追问 → 原问题必须不丢、继续回答"},
+     "notes": "Step 4（G3 闭环）：轮1 建档话术（月收入+存款+带金额配置问题）→ 弹确认卡；"
+              "自动模拟取消 = 拒绝本次建档 ≠ 拒绝回答——cancel_and_reanswer 把原问题（original_query）"
+              "重新投入正常 Advisor 路径（filing_declined 跳过建档 gate，防死循环），"
+              "回答原配置问题（CHECK_ALLOCATION，status=ok，真实配置指标），不再返回「好的，已忽略」。"
+              "family=filed 让 CHECK_ALLOCATION 有真实配置指标可测"},
     # -- 不重复问已有信息（#4，两轮）--
     {"id": 11, "title": "已有收入是否被重复追问",
      "messages": ["帮我看看我的现金流情况", "我收入多少你不是知道吗，为什么还要问"],
@@ -196,12 +199,22 @@ def run_question(q: dict, fid: int, llm) -> dict:
             t["chat_log"] = list(tracer.chat_log)
             t["complete_log"] = list(tracer.complete_log)
         turns.append(t)
-        # G3 测量：本轮弹了建档确认卡 → 自动模拟「取消」并记录取消结果。
-        # 当前行为：取消只返回 discarded，原问题不保留、不重新回答（正是 G3 缺陷）。
+        # G3 测量：本轮弹了建档确认卡 → 自动模拟「取消」。
+        # Step 4：取消 = 拒绝本次建档 ≠ 拒绝回答——reanswer_after_cancel 题用
+        # cancel_and_reanswer 把原问题重新投入回答路径，re-answer 作为本轮主测量
+        # （filing_card 只作 meta）；其余题保留旧口径（取消只记 discarded，暴露 G3 缺陷）。
         if isinstance(result, ConfirmCard):
-            canc = apply_confirmation(user["family_id"], result.pending_id,
-                                      confirmed=False)
-            t["cancel"] = {"type": canc.type, "message": canc.message}
+            t["filing_card"] = {"pending_items": t.pop("pending_items", 0),
+                                "message_head": t.pop("message_head", None)}
+            if q.get("reanswer_after_cancel"):
+                resp = cancel_and_reanswer(user, result.pending_id, llm=llm)
+                t["cancel"] = {"type": "discarded"}
+                t["reanswer"] = True
+                t.update(measure(resp))
+            else:
+                canc = apply_confirmation(user["family_id"], result.pending_id,
+                                          confirmed=False)
+                t["cancel"] = {"type": canc.type, "message": canc.message}
     return {"id": q["id"], "title": q["title"], "family": q["family"],
             "turns": turns}
 
@@ -251,12 +264,15 @@ def render_report(units: list[dict], real: bool) -> str:
         lines.append("")
         for i, t in enumerate(u["turns"], 1):
             lines.append(f"**第{i}轮 用户**：{t['message']}")
-            if t["returned"] == "ConfirmCard":
-                lines.append(f"第{i}轮：⚠️ ConfirmCard（建档确认卡，items={t['pending_items']}）")
-                if t.get("cancel"):
+            if t.get("filing_card"):
+                fc = t["filing_card"]
+                lines.append(f"第{i}轮：⚠️ ConfirmCard（建档确认卡，items={fc['pending_items']}）→ 用户取消")
+                if t.get("reanswer"):
+                    lines.append("  → 取消建档 = 拒绝本次建档 ≠ 拒绝回答：原问题重新回答 ↓")
+                elif t.get("cancel"):
                     c = t["cancel"]
                     lines.append(f"  → 模拟取消：{c['type']}「{c['message']}」（原问题是否保留？）")
-            elif t["returned"] == "AgentResponse":
+            if t["returned"] == "AgentResponse":
                 lines.append(f"第{i}轮：intent={t['intent']} status={t['status']}")
                 if t["summary_head"]:
                     lines.append(f"  回答：{t['summary_head']}")
@@ -284,7 +300,7 @@ def render_report(units: list[dict], real: bool) -> str:
                             lines.append(f"  complete_json#{i}：parse 失败(None)")
                         else:
                             lines.append(f"  complete_json#{i}：keys={cj['keys']}")
-            else:
+            elif not t.get("filing_card"):
                 lines.append(f"第{i}轮：⚠️ 返回 `{t['returned']}`")
             lines.append("")
     return "\n".join(lines)

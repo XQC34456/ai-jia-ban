@@ -1,10 +1,10 @@
-"""V1.0 Step 2+3 契约测试：AdvisorContext 不变量冻结（T1–T7，先红后绿）。
+"""V1.0 Step 2+3+4 契约测试：AdvisorContext 不变量冻结（T1–T8b，先红后绿）。
 
 依据：docs/design-advisor-context.md §5/§8（用户 2026-08-15 锁定）。
 铁律：数字唯一来源是 Engine/Decision；Context 永不成为计算来源（T4 = Phase 1 硬红线）。
 零 API 成本（FakeLLMProvider/NullProvider 确定性），CI 安全。
 
-七条不变量（任意一条变红即回归，须有意为之）：
+八条不变量（任意一条变红即回归，须有意为之）：
   T1  context 不得丢：goals context + 模糊消息 → intent 被 SEED 到 intent_hint。
   T1b 用户当前 query 压倒页面 intent_hint（SEED 不是 OVERRIDE）。
   T2  原 query 不得丢：弹建档卡 → 取消 → AppliedResponse.original_query 返回原问题。
@@ -14,6 +14,9 @@
   T6  payload 白名单：各 source 禁止字段被剥离，绝不静默接受。
   T7  advisor_path 消费 Context（Step 3 硬红线）：同一问题，有/无 Context，
       顾问回答必须产生可解释的差异；Context 块（【当前情境】）零数字（T4 同源）。
+  T8  取消建档后继续回答（Step 4 硬红线）：取消 = 拒绝本次建档 ≠ 拒绝回答——
+      原问题用 original_query 重新投入回答路径，不再次弹卡、走正常 Advisor 路径。
+  T8b filing_declined 语义在代码层明确：同一建档话术不再弹卡/追问（防死循环）。
 """
 import json
 import re
@@ -21,10 +24,10 @@ import re
 import pytest
 
 from app import db
-from app.agent.entry import converse
+from app.agent.entry import cancel_and_reanswer, converse
 from app.agent.profile import apply_confirmation
 from app.agent.provider import FakeLLMProvider, NullProvider
-from app.schemas.agent import ConfirmCard
+from app.schemas.agent import AgentResponse, ConfirmCard
 from app.schemas.context import AdvisorContextRequest, build_advisor_context, detect_missing
 
 from advisor_eval.family import build_family
@@ -230,3 +233,46 @@ def test_t7_advisor_path_consumes_context_explainable_difference(db_):
     block = m.group(1)
     assert re.search(r"\d", block) is None, f"Context 块含数字（T4 红线）：{block!r}"
     assert "gap" not in block and "monthly_need" not in block
+
+
+# ---------- T8 / T8b：取消建档后继续回答（Step 4 硬红线） ----------
+
+def test_t8_cancel_reanswers_original_query(db_):
+    """取消建档 = 拒绝本次建档 ≠ 拒绝回答（Step 4 硬红线）：
+    1. 用 original_query 重新投入回答路径（不猜 canned 文案）——原问题完整保留。
+    2. 不再弹建档卡（防死循环）。
+    3. 走正常 Advisor 路径：status=ok，回答用户最初的问题，而非「好的，已忽略」。
+    """
+    fid = db_.create_family("空家庭")
+    user = _user(fid)
+    msg = "我月收入 3 万，存款 50 万，这 30 万怎么配置？"
+
+    # 建档话术（带金额）→ 必须先弹确认卡（G1 gate 现状，Step 4 不改它）
+    card = converse(msg, user, llm=NullProvider())
+    assert isinstance(card, ConfirmCard), f"建档话术必须先弹卡，实际 {type(card).__name__}"
+
+    # 取消 → 原问题不丢、不二次弹卡、走正常 Advisor 路径回答原问题
+    resp = cancel_and_reanswer(user, card.pending_id, llm=NullProvider())
+    assert isinstance(resp, AgentResponse), \
+        f"取消后必须回到正常回答路径，实际 {type(resp).__name__}"
+    assert resp.status == "ok", f"取消后必须真的回答（status=ok），实际 {resp.status}"
+    assert resp.intent == "CHECK_ALLOCATION", \
+        f"必须回答原配置问题（原问题完整保留），实际 intent={resp.intent}"
+    assert resp.summary != "好的，已忽略，没有改动你的档案。", "不得降级成 discarded 文案"
+
+    # pending 已被消费：再次取消 → error（不重复回答、不重复弹卡）
+    again = apply_confirmation(fid, card.pending_id, confirmed=False)
+    assert again.type == "error"
+
+
+def test_t8b_filing_declined_bypasses_filing_gate(db_):
+    """filing_declined 语义在代码层明确：同一建档话术不再弹卡/追问（防死循环）。"""
+    fid = db_.create_family("空")
+    user = _user(fid)
+    msg = "我月收入 3 万，存款 50 万"
+    # 正常路径先确认会弹卡
+    assert isinstance(converse(msg, user, llm=NullProvider()), ConfirmCard)
+    # filing_declined 明确标记「已拒绝本次建档」→ 该话术按正常提问处理，不弹卡
+    r = converse(msg, user, llm=NullProvider(), context={"filing_declined": True})
+    assert isinstance(r, AgentResponse), f"filing_declined 后不得再弹卡，实际 {type(r).__name__}"
+    assert r.status == "ok"

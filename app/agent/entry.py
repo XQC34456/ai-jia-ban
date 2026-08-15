@@ -11,12 +11,12 @@ from ..schemas.context import QUESTION_SOURCES, AdvisorContext, build_advisor_co
 from .context import build_wealth_context, context_to_text
 from .layers import attach_layers
 from .memory import build_memory_context, detect_invalidation, record_turn
-from .profile import create_confirm, extract_actions, looks_like_filing
+from .profile import cancel_confirmation, create_confirm, extract_actions, looks_like_filing
 from .provider import LLMProvider
 from .response import build_response
 from .runtime import handle
 
-__all__ = ["converse"]
+__all__ = ["converse", "cancel_and_reanswer"]
 
 _FILING_CLARIFY_SUMMARY = (
     "我识别到你在介绍家庭财务情况，但有些金额我还没听清。"
@@ -43,7 +43,10 @@ def converse(message: str, user: dict, llm: LLMProvider | None = None,
     # G1 解法（设计 §3）：提问面来源（goals/retirement/allocation/sandbox/overview）天然是
     # 「提问」——source 是构造事实，建档判定不参与意图。source=chat 保留现状建档判定，
     # 只作「非情景词 + 非问句 + 有金额」时的兜底，不再抢先覆盖回答。
-    if advisor_ctx.request.source not in QUESTION_SOURCES:
+    # Step 4（G3 闭环）：filing_declined=True 表示用户已拒绝本次建档（取消的是数据录入，
+    # 不是自己的问题）——跳过同一次建档 gate，把原问题直接投入正常回答路径（防死循环）。
+    if (advisor_ctx.request.source not in QUESTION_SOURCES
+            and not advisor_ctx.request.filing_declined):
         actions = extract_actions(message, llm=llm)
         if actions:
             db.record_event(family_id, "intent_asked", intent="filing")
@@ -67,6 +70,42 @@ def converse(message: str, user: dict, llm: LLMProvider | None = None,
                         meta={"status": result.status})
     record_turn(family_id, message, result)
     return result
+
+
+def cancel_and_reanswer(user: dict, pending_id: str,
+                        llm: LLMProvider | None = None) -> AgentResponse | ConfirmCard:
+    """取消建档后继续回答（Step 4，G3 闭环）：**拒绝本次建档 ≠ 拒绝回答**。
+
+    消费 pending（cancel_confirmation 弹出，返回 discarded 响应 + 原问题 + 解析后 ctx），
+    以 filing_declined 语义把原问题重新投入正常回答路径：
+
+    1. 原问题完整保留：用 original_query（用户字面原话）重新回答，绝不从 canned 文案猜。
+    2. 不二次弹卡：filing_declined=True 跳过同一次建档 gate（防死循环）。
+    3. 走正常 Advisor 路径：重新进 converse → handle → route_intent/advisor，
+       不降级成模板/fallback——用户取消的是数据录入动作，不是自己的问题。
+
+    pending 失效/跨家庭 → 返回 error（与 apply_confirmation 同口径，不重复回答）。
+    """
+    disc, original_query, pending_ctx = cancel_confirmation(user["family_id"], pending_id)
+    if disc.type == "error":
+        return disc
+    if not original_query:
+        return disc  # 防御：无原问题可答（正常不会发生）
+    re_ctx = _reanswer_context(pending_ctx, original_query)
+    return converse(original_query, user, llm=llm, context=re_ctx)
+
+
+def _reanswer_context(pending_ctx, original_query: str) -> dict:
+    """把已拒绝建档的上下文重建成「正常回答路径」的请求 dict（Step 4）。
+
+    - source 保留（建档来自 chat，source 即 chat；保留语义完整性）
+    - query = 用户原问题（G3 恢复物，独立于建档流程跨取消存活）
+    - filing_declined=True：本次回答明确「已拒绝本次建档」，converse 跳过建档 gate
+    """
+    src = "chat"
+    if pending_ctx is not None and getattr(pending_ctx, "request", None) is not None:
+        src = pending_ctx.request.source or "chat"
+    return {"source": src, "query": original_query, "filing_declined": True}
 
 
 def _wealth_context_text(user: dict) -> str | None:

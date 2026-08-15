@@ -213,31 +213,33 @@
  },
  {
   "id": 10,
-  "family": "empty",
+  "family": "filed",
   "turns": [
    {
     "returned": "AgentResponse",
-    "intent": "EXPLAIN_RESULT",
-    "status": "need_clarification",
-    "metric_keys": [],
-    "key_numbers": [],
-    "evidence_paths": [],
-    "has_next_actions": false,
-    "priorities": [],
-    "iron_ok": true,
-    "cancel_type": null
-   },
-   {
-    "returned": "AgentResponse",
-    "intent": "CHECK_ISSUES",
+    "intent": "CHECK_ALLOCATION",
     "status": "ok",
-    "metric_keys": [],
-    "key_numbers": [],
+    "metric_keys": [
+     "alternative_pct",
+     "cash_pct",
+     "equity_pct",
+     "fixed_income_pct",
+     "other_pct",
+     "real_estate_pct"
+    ],
+    "key_numbers": [
+     "alternative_pct=0.0@overview.asset_allocation.classes.alternative.pct",
+     "cash_pct=0.625@overview.asset_allocation.classes.cash.pct",
+     "equity_pct=0.375@overview.asset_allocation.classes.equity.pct",
+     "fixed_income_pct=0.0@overview.asset_allocation.classes.fixed_income.pct",
+     "other_pct=0.0@overview.asset_allocation.classes.other.pct",
+     "real_estate_pct=0.0@overview.asset_allocation.classes.real_estate.pct"
+    ],
     "evidence_paths": [],
     "has_next_actions": false,
     "priorities": [],
     "iron_ok": true,
-    "cancel_type": null
+    "cancel_type": "discarded"
    }
   ]
  },

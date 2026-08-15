@@ -16,7 +16,9 @@ from pydantic import BaseModel
 
 from . import db, decision, report
 from .api import agent, event, goal, onboarding, scenario, wealth
+from .agent.entry import cancel_and_reanswer
 from .agent.profile import apply_confirmation
+from .agent.providers import get_provider
 
 
 def _load_dotenv() -> None:
@@ -152,8 +154,16 @@ def get_family(user: dict = Depends(get_current_user)):
 
 @app.post("/api/confirm")
 def confirm_endpoint(body: ConfirmIn, user: dict = Depends(get_current_user)):
-    """建档确认落地：已迁移到 Agent 吸收层 profile.apply_confirmation（落地前不写库）。"""
-    return apply_confirmation(user["family_id"], body.pending_id, body.confirmed).model_dump()
+    """建档确认落地：已迁移到 Agent 吸收层 profile.apply_confirmation（落地前不写库）。
+
+    Step 4（G3 闭环）：确认 → 写库；取消 → **拒绝本次建档 ≠ 拒绝回答**——
+    cancel_and_reanswer 用原问题（original_query）重新投入 Advisor 回答路径，
+    返回正常回答（AgentResponse），不再只是「好的，已忽略」。
+    """
+    if body.confirmed:
+        return apply_confirmation(user["family_id"], body.pending_id, True).model_dump()
+    resp = cancel_and_reanswer(user, body.pending_id, llm=get_provider())
+    return resp.model_dump()
 
 
 @app.get("/api/report")

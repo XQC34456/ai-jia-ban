@@ -20,14 +20,14 @@
 
 **第1轮 用户**：我有 30 万现金，现在适不适合投资？
 第1轮：intent=SCENARIO_COMPARE status=ok
-  回答：目前无法判断这笔钱是否适合投资，因为家庭财务数据基本空白，需要先建档并补充关键信息。
-  确定性工具(metrics)：['cashflow_surplus', 'net_worth', 'wealth_score']
-  关键数字：['cashflow_surplus=0.0@overview.cashflow.surplus', 'net_worth=0.0@overview.net_worth', 'wealth_score=46.0@overview.wealth_score']
-  证据路径：['overview.cashflow.surplus', 'overview.wealth_score']
-  行动建议：['提供月收入、月支出、家庭成员数、负债情况、保险情况', '待信息补齐后，通过情景模拟比较投资与不投资的影响']
+  回答：已生成家庭财务分析，详见下方画像与下一步行动。
+  确定性工具(metrics)：['alternative_pct', 'cash_pct', 'cashflow_expense', 'cashflow_income', 'cashflow_surplus', 'equity_pct', 'fixed_income_pct', 'net_worth', 'other_pct', 'real_estate_pct', 'wealth_score']
+  关键数字：['alternative_pct=0.0@overview.asset_allocation.classes.alternative.pct', 'cash_pct=0.0@overview.asset_allocation.classes.cash.pct', 'cashflow_expense=0.0@overview.cashflow.expense', 'cashflow_income=0.0@overview.cashflow.income', 'cashflow_surplus=0.0@overview.cashflow.surplus', 'equity_pct=0.0@overview.asset_allocation.classes.equity.pct', 'fixed_income_pct=0.0@overview.asset_allocation.classes.fixed_income.pct', 'net_worth=0.0@overview.net_worth', 'other_pct=0.0@overview.asset_allocation.classes.other.pct', 'real_estate_pct=0.0@overview.asset_allocation.classes.real_estate.pct', 'wealth_score=46.0@overview.wealth_score']
+  证据路径：['overview.wealth_score']
+  行动建议：['核实并补充收入、支出数据', '评估现有保险覆盖，补充必要的保障型产品']
   铁律：全部通过
-  chat#1：tool_calls=[get_family_profile,get_wealth_issues,get_wealth_overview] content='我先了解一下你的家庭财务全貌，再回答这个问题。'
-  chat#2：tool_calls=[无工具] content='我先把话说清楚：**你现在这笔 30 万适不适合投资，我目前还无法判断——因为你家几乎什么数据都还没录进来。**\n\n这不是敷衍，是真实的依据不足。让我把情况摊开给你看。\n\n---\n\n### 我看到了什么\n\n你的家庭档案是一个**未建档家庭**：没有成员、没有资产、没有负债、没有收入流水、没有目标、没有保险。\n\n财富评分 46（"脆弱"档），但拆开看会发现——这个低分不是因为你穷，而是因为**系统里'
+  chat#1：tool_calls=[get_family_profile,get_wealth_overview,get_wealth_issues,get_cashflow,get_allocation] content='我先来了解一下你的家庭财务状况，这样才能给出针对性的建议。'
+  chat#2：tool_calls=[无工具] content='我看了一下系统里的家庭数据，这里有件很重要的事需要先跟你讲清楚。\n\n## 现在的局面是：我几乎没有你的任何数据\n\n你说的"有 30 万现金"，但系统里在资金端、收入端、支出端、家庭结构端**全部是空白**——没有你的收入、没有支出、没有家庭其他资产，甚至连你是单身还是已婚有孩子都不知道。\n\n我不能在这样一个信息真空里，就直接回答你"30 万该不该投资、投到哪"。那是不负责任的。\n\n不过在追问之前，'
   complete_json#1：keys=['evidence', 'finding', 'missing', 'next_actions', 'recommendations', 'refuse', 'summary', 'tradeoffs', 'uncertainty']
 
 ## 1b 30万现金适不适合投资（已建档）
@@ -47,14 +47,14 @@
 **第1轮 用户**：我有 30 万现金，现在适不适合投资？
 第1轮：intent=SCENARIO_COMPARE status=ok
   回答：当前最需要关注：资产配置适配度偏低（配置适配度 51 分）
-  确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'alternative_pct', 'cash_pct', 'cashflow', 'cashflow_expense', 'cashflow_income', 'cashflow_savings_rate', 'cashflow_surplus', 'dti', 'equity_pct', 'fixed_income_pct', 'goal_1_coverage', 'goal_1_gap', 'goal_completion', 'liquidity', 'liquidity_months', 'net_worth', 'nwc', 'other_pct', 'real_estate_pct', 'rfr', 'wealth_score']
-  关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'alternative_pct=0.0@overview.asset_allocation.classes.alternative.pct', 'cash_pct=0.625@overview.asset_allocation.classes.cash.pct', 'cashflow=0.0@comparison.A.cashflow.delta', 'cashflow_expense=30000.0@overview.cashflow.expense', 'cashflow_income=40000.0@overview.cashflow.income', 'cashflow_savings_rate=0.25@overview.cashflow.savings_rate', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=0.0@comparison.A.dti.delta', 'dti=0.3@overview.debt.dti', 'equity_pct=0.375@overview.asset_allocation.classes.equity.pct', 'fixed_income_pct=0.0@overview.asset_allocation.classes.fixed_income.pct', 'goal_1_coverage=0.1@goals.1.coverage', 'goal_1_gap=900000.0@goals.1.gap', 'goal_completion=0.0@comparison.A.goal_completion.delta', 'liquidity=0.0@comparison.A.liquidity.delta', 'liquidity_months=16.7@overview.liquidity.emergency_months', 'net_worth=-1200000.0@overview.net_worth', 'net_worth=0.0@comparison.A.net_worth.delta', 'nwc=0.01@comparison.A.nwc.delta', 'other_pct=0.0@overview.asset_allocation.classes.other.pct', 'real_estate_pct=0.0@comparison.A.real_estate_pct.delta', 'real_estate_pct=0.0@overview.asset_allocation.classes.real_estate.pct', 'rfr=0.01@comparison.A.rfr.delta', 'wealth_score=3.0@comparison.A.wealth_score.delta', 'wealth_score=78.0@overview.wealth_score']
-  证据路径：['overview.asset_allocation.classes.real_estate.pct', 'overview.liquidity.emergency_months', 'overview.retirement.nwc', 'overview.wealth_score']
-  行动建议：['评估家庭保险需求，优先补齐保险保障']
+  确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'alternative_pct', 'cash_pct', 'cashflow', 'cashflow_surplus', 'dti', 'equity_pct', 'fixed_income_pct', 'goal_1_coverage', 'goal_1_gap', 'goal_completion', 'liquidity', 'liquidity_months', 'net_worth', 'nwc', 'other_pct', 'real_estate_pct', 'rfr', 'wealth_score']
+  关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'alternative_pct=0.0@overview.asset_allocation.classes.alternative.pct', 'cash_pct=0.625@overview.asset_allocation.classes.cash.pct', 'cashflow=0.0@comparison.A.cashflow.delta', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=0.0@comparison.A.dti.delta', 'dti=0.3@overview.debt.dti', 'equity_pct=0.375@overview.asset_allocation.classes.equity.pct', 'fixed_income_pct=0.0@overview.asset_allocation.classes.fixed_income.pct', 'goal_1_coverage=0.1@goals.1.coverage', 'goal_1_gap=900000.0@goals.1.gap', 'goal_completion=0.0@comparison.A.goal_completion.delta', 'liquidity=0.0@comparison.A.liquidity.delta', 'liquidity_months=16.7@overview.liquidity.emergency_months', 'net_worth=-1200000.0@overview.net_worth', 'net_worth=0.0@comparison.A.net_worth.delta', 'nwc=0.01@comparison.A.nwc.delta', 'other_pct=0.0@overview.asset_allocation.classes.other.pct', 'real_estate_pct=0.0@comparison.A.real_estate_pct.delta', 'real_estate_pct=0.0@overview.asset_allocation.classes.real_estate.pct', 'rfr=0.01@comparison.A.rfr.delta', 'wealth_score=3.0@comparison.A.wealth_score.delta', 'wealth_score=78.0@overview.wealth_score']
+  证据路径：['overview.liquidity.emergency_months', 'overview.wealth_score']
+  行动建议：['询问此前股票资金的来源背景']
   铁律：❌ 数字无编造
-  chat#1：tool_calls=[get_wealth_overview,get_wealth_issues,get_allocation,get_cashflow,get_goals] content='让我先理解你的问题。你有 30 万现金，在考虑是否投资。这其实是一个"资产配置决策"。要回答好这个问题，我需要先看清楚你家庭的资金状况、已有的资产配置和财富问题。让我调取相关数据。'
-  chat#2：tool_calls=[compare_scenarios] content='我先梳理一下你的情况，再回答"30 万适不适合投资"这个问题。\n\n先看清你的现状：\n- 你手上现金约 50 万（liquid_assets），再加这 30 万，总量不小。\n- 净资产是负的（-120 万），背后是一笔 200 万、240 期、利率 3.5% 的房贷。\n- 你的资产配置有个结构性偏差：**现金占 62%，固收 0%，股票 38%**。这就是系统标为 P1「配置适配度偏低」的原因——不'
-  chat#3：tool_calls=[无工具] content='数据已经很有说服力了。我把三个方向的结果摆出来，直接给你看清楚"得到什么/失去什么"。\n\n先直接回答你的问题：**"适不适合投资"不是好问题，好问题应该是"这 30 万往哪儿放"。** 因为你的资金本来就已经偏在这儿了。\n\n## 你的现状：不是缺投资，是投资结构失衡\n\n- 你当下的金融资产里，**现金占 62%（约 50 万），固收 0%，股票 38%**。\n- 系统给你的 P1 问题就是「配置适'
+  chat#1：tool_calls=[get_wealth_overview,get_wealth_issues,get_goals,get_allocation] content='我来帮你分析这个投资决策。先让我了解一下你家庭的完整状况。\n\n让我先看看你的财富全景和问题清单，理解你现在的处境。'
+  chat#2：tool_calls=[run_scenario] content='我已经掌握了你的家庭全貌。让我来帮你梳理这个投资决策。\n\n先看几个关键事实：\n- 你手里 30 万现金，加上已有流动资产总共 50 万在现金里\n- 你的资产配置里现金占比非常高，固收却是 0%\n- 你的孩子教育金还有很大缺口\n- 你没有任何保险\n\n在给方向之前，让我用情景模拟验证一下"把现金投入配置"会怎样。你的主要矛盾是**资产配置适配度偏低（P1）**，这直接关系你"这 30 万该不该动、往哪'
+  chat#3：tool_calls=[无工具] content='我已经得到了清晰的模拟结果。现在我可以给你一个扎实的判断。\n\n---\n\n**结论先行：你手里这 30 万现金，不应该是"要不要投"的问题，而是"投哪一类"。答案很明确——不是再投股票，而是补上你几乎为零的固收（稳健资产）。**\n\n为什么这么判断，我给你拆开讲。\n\n**一、你的真问题不是"钱多了该不该投资"，而是"钱全躺在现金里、结构失衡"**\n\n看你的配置现状就知道问题有多集中：\n- 你的流动资产'
   complete_json#1：keys=['evidence', 'finding', 'missing', 'next_actions', 'recommendations', 'refuse', 'summary', 'tradeoffs', 'uncertainty']
 
 ## 2 30万投入股票怎么分
@@ -63,19 +63,13 @@
 
 **验收判级**：
 
-- ✅ 不被建档吞
-- ✅ 返回类型
+- ❌ 不被建档吞
+- ❌ 返回类型
 - ❌ 状态ok
-- ✅ 铁律·数字无编造
-- ✅ 铁律·source 正确
-- ✅ 铁律·status 正确
-- ✅ 铁律·无内部标识
 
 **第1轮 用户**：我想把 30 万投入股票，应该怎么分？
-第1轮：intent=EXPLAIN_RESULT status=need_clarification
-  回答：我识别到你在介绍家庭财务情况，但有些金额我还没听清。请说得更具体些，例如：月收入多少、房贷月供多少、存款大概多少。
-  铁律：全部通过
-  chat#1：tool_calls=[无工具] content='我来帮你规划股票投资方案。不过在做具体配置建议之前，我需要先了解一下你的整体财务状况。\n\n你只提到想投入30万买股票，我希望能先建立你的家庭财务档案，这样才能给出更贴合你情况的分仓建议。\n\n我需要确认几个关键信息：\n\n1. **这笔30万占你的总资产或可投资资产的比例大概是多少？**（比如是全部积蓄，还是其中的一部分）\n2. **你目前的收入情况？**（月收入或年收入）\n3. **有没有其他负债？'
+第1轮：⚠️ ConfirmCard（建档确认卡，items=1）→ 用户取消
+  → 模拟取消：discarded「好的，已忽略，没有改动你的档案。」（原问题是否保留？）
 
 ## 3 提前还车贷还是拿钱投资
 
@@ -93,14 +87,14 @@
 
 **第1轮 用户**：我该提前还车贷还是拿钱投资？
 第1轮：intent=SCENARIO_COMPARE status=ok
-  回答：用户的问题基于一个数据前提，即家庭负债中有车贷，但实际资产负债表显示只有房贷，没有车贷。
-  确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'alternative_pct', 'cash_pct', 'cashflow_expense', 'cashflow_income', 'cashflow_savings_rate', 'cashflow_surplus', 'dti', 'equity_pct', 'fixed_income_pct', 'goal_1_coverage', 'goal_1_gap', 'liquidity_months', 'net_worth', 'other_pct', 'real_estate_pct', 'wealth_score']
-  关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'alternative_pct=0.0@overview.asset_allocation.classes.alternative.pct', 'cash_pct=0.625@overview.asset_allocation.classes.cash.pct', 'cashflow_expense=30000.0@overview.cashflow.expense', 'cashflow_income=40000.0@overview.cashflow.income', 'cashflow_savings_rate=0.25@overview.cashflow.savings_rate', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=0.3@overview.debt.dti', 'equity_pct=0.375@overview.asset_allocation.classes.equity.pct', 'fixed_income_pct=0.0@overview.asset_allocation.classes.fixed_income.pct', 'goal_1_coverage=0.1@goals.1.coverage', 'goal_1_gap=900000.0@goals.1.gap', 'liquidity_months=16.7@overview.liquidity.emergency_months', 'net_worth=-1200000.0@overview.net_worth', 'other_pct=0.0@overview.asset_allocation.classes.other.pct', 'real_estate_pct=0.0@overview.asset_allocation.classes.real_estate.pct', 'wealth_score=78.0@overview.wealth_score']
-  证据路径：['overview.liquidity.emergency_months', 'overview.wealth_score']
-  行动建议：['向用户确认车贷的具体信息。', '若为房贷，可进行提前还款与投资的情景模拟。', '若为未录入的车贷，补充录入数据后重新评估。']
+  回答：顾问指出用户提及车贷，但系统中只有一笔房贷，需先澄清负债性质，才能判断提前还款还是投资更优。基于现有数据，家庭现金超配且资产配置偏离目标，可先进行方向性分析，但
+  确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'alternative_pct', 'cash_pct', 'cashflow_expense', 'cashflow_income', 'cashflow_savings_rate', 'cashflow_surplus', 'dti', 'equity_pct', 'fixed_income_pct', 'liquidity_months', 'net_worth', 'other_pct', 'real_estate_pct', 'wealth_score']
+  关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'alternative_pct=0.0@overview.asset_allocation.classes.alternative.pct', 'cash_pct=0.625@overview.asset_allocation.classes.cash.pct', 'cashflow_expense=30000.0@overview.cashflow.expense', 'cashflow_income=40000.0@overview.cashflow.income', 'cashflow_savings_rate=0.25@overview.cashflow.savings_rate', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=0.3@overview.debt.dti', 'equity_pct=0.375@overview.asset_allocation.classes.equity.pct', 'fixed_income_pct=0.0@overview.asset_allocation.classes.fixed_income.pct', 'liquidity_months=16.7@overview.liquidity.emergency_months', 'net_worth=-1200000.0@overview.net_worth', 'other_pct=0.0@overview.asset_allocation.classes.other.pct', 'real_estate_pct=0.0@overview.asset_allocation.classes.real_estate.pct', 'wealth_score=78.0@overview.wealth_score']
+  证据路径：['overview.cashflow.surplus', 'overview.wealth_score']
+  行动建议：['补充车贷具体情况', '核实资金用途和风险承受力']
   铁律：全部通过
-  chat#1：tool_calls=[get_family_profile,get_wealth_overview,get_wealth_issues,get_cashflow,get_goals,get_allocation] content='让我先理解一下你的问题。你说到"提前还车贷还是拿钱投资"，但我在你的家庭概况里并没有看到车贷这个负债项。让我先调用工具，了解这个家庭的真实情况。\n\n我需要先获取全面的家庭数据和问题清单。'
-  chat#2：tool_calls=[无工具] content='我需要先指出一个重要的事实差异，然后再回答你的问题。\n\n**关于你的问题，有一个关键前提需要先对齐**：在我看到的家庭数据里，你的负债只有一项——房贷（本金 200 万，月供 12000 元，利率 3.5%）。**你的资产负债表里并没有"车贷"这个负债项**。\n\n所以可能有几种情况：\n- 你可能把"房贷"说成了"车贷"？\n- 或者有一笔车贷还没录入到家庭账本里？\n\n在我还没搞清楚你说的"车贷"到底'
+  chat#1：tool_calls=[get_wealth_issues,get_family_profile,get_cashflow,get_allocation] content='我需要先理解这个家庭的全貌和优先问题，然后才能给出有依据的建议。让我先调用工具获取数据。'
+  chat#2：tool_calls=[无工具] content='我需要先明确一个关键事实：用户问的是「车贷」，但我看到这个家庭只有一笔负债——是房贷 200 万、利率 3.5%、月供 1.2 万。我需要确认用户说的「车贷」是否就是这笔负债，还是另外有一笔我没看到的信息。\n\n让我先看看是否有车贷的更多信息，同时理解用户手上到底有多少可用于决策的现金。\n\n从数据看，这个家庭的情况很清晰了。我先梳理一下我看到的事实，然后再调用情景模拟工具来验证不同的资金安排方向。\n'
   complete_json#1：keys=['evidence', 'finding', 'missing', 'next_actions', 'recommendations', 'refuse', 'summary', 'tradeoffs', 'uncertainty']
 
 ## 4 收入下降20%能撑多久
@@ -112,21 +106,22 @@
 - ✅ 不被建档吞
 - ✅ 返回类型
 - ✅ 状态ok
-- ✅ 铁律·数字无编造
+- ❌ 铁律·数字无编造
 - ✅ 铁律·source 正确
 - ✅ 铁律·status 正确
 - ✅ 铁律·无内部标识
 
 **第1轮 用户**：如果收入下降 20%，我能撑多久？
 第1轮：intent=SCENARIO_COMPARE status=ok
-  回答：短期现金储备足以覆盖生活，但收入下降触发储蓄率、养老覆盖比和房贷负担三个风险信号同时亮起，真正的挑战在长期养老和负债结构。
+  回答：当前最需要关注：资产配置适配度偏低（配置适配度 51 分）
   确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'cashflow', 'cashflow_expense', 'cashflow_income', 'cashflow_savings_rate', 'cashflow_surplus', 'dti', 'goal_completion', 'liquidity', 'liquidity_months', 'net_worth', 'nwc', 'real_estate_pct', 'rfr', 'wealth_score']
   关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'cashflow=-8000.0@comparison.A.cashflow.delta', 'cashflow_expense=30000.0@overview.cashflow.expense', 'cashflow_income=40000.0@overview.cashflow.income', 'cashflow_savings_rate=0.25@overview.cashflow.savings_rate', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=0.075@comparison.A.dti.delta', 'dti=0.3@overview.debt.dti', 'goal_completion=0.0@comparison.A.goal_completion.delta', 'liquidity=0.0@comparison.A.liquidity.delta', 'liquidity_months=16.7@overview.liquidity.emergency_months', 'net_worth=-1200000.0@overview.net_worth', 'net_worth=0.0@comparison.A.net_worth.delta', 'nwc=-0.54@comparison.A.nwc.delta', 'real_estate_pct=0.0@comparison.A.real_estate_pct.delta', 'rfr=-0.54@comparison.A.rfr.delta', 'wealth_score=-17.0@comparison.A.wealth_score.delta', 'wealth_score=78.0@overview.wealth_score']
-  证据路径：['overview.cashflow.savings_rate', 'overview.debt.dti', 'overview.liquidity.emergency_months', 'overview.retirement.nwc', 'overview.retirement.rfr']
-  行动建议：['明确收入下降是暂时（如一年）还是长期，以决定具体策略。', '进行一次更细的测算，对比不同持续时间的影响。']
-  铁律：全部通过
-  chat#1：tool_calls=[get_wealth_overview,get_cashflow,get_wealth_issues,run_scenario] content='我来帮你评估收入下降 20% 对家庭的影响。首先让我了解一下当前的情况。'
-  chat#2：tool_calls=[无工具] content='我来帮你把这个"收入下降 20%"的问题看清楚。先给你一个直接的判断，再说说背后的关键变化。\n\n## 先说结论\n\n**短期"撑得住"，但这是全家安全垫的临界测试——真正的风险不在眼前几个月，而在长期（养老）和结构性（负债、保险）上。**\n\n## 问题比"能撑多久"更值得看的地方\n\n你问的是"能撑多久"，但数据显示：**这个场景会让你的家庭从"稳健"滑到"需关注"，而且暴露出三个平时被掩盖的隐患。*'
+  证据路径：['overview.asset_allocation.classes.real_estate.pct', 'overview.debt.dti', 'overview.liquidity.emergency_months', 'overview.retirement.rfr']
+  行动建议：['明确收入下降的性质（短期还是长期）', '核实是否还有其他收入来源']
+  铁律：❌ 数字无编造
+  chat#1：tool_calls=[get_cashflow,get_wealth_overview,get_wealth_issues] content='我来帮你分析这个关键问题。先获取家庭现状数据来模拟收入下降的影响。\n\n让我先调取现金流和整体状况的数据。'
+  chat#2：tool_calls=[run_scenario] content='我来模拟收入下降 20% 对家庭应急能力的影响。'
+  chat#3：tool_calls=[无工具] content='数据已经拿到了，我来分析这个情景。\n\n先理清一个关键点：**"能撑多久"其实有两层含义**，我分开说。\n\n---\n\n## 你问的"撑多久"，答案取决于你指的是哪件事\n\n### 第一层：靠手头现金能撑几个月？\n\n从数据看，你的家庭持有 **50 万现金** 作为流动资产，同时每月的支出是 **3 万**。也就是说，即便收入完全中断、一分钱不进账，你现在的现金池也能覆盖约 **16.7 个月的支出**'
   complete_json#1：keys=['evidence', 'finding', 'missing', 'next_actions', 'recommendations', 'refuse', 'summary', 'tradeoffs', 'uncertainty']
 
 ## 5 孩子教育金目标怎么完成
@@ -137,23 +132,22 @@
 
 - ✅ 不被建档吞
 - ✅ 返回类型
-- ✅ 状态ok
+- ❌ 状态ok
 - ✅ 铁律·数字无编造
 - ✅ 铁律·source 正确
 - ✅ 铁律·status 正确
 - ✅ 铁律·无内部标识
 
 **第1轮 用户**：这个孩子教育金目标怎么完成？
-第1轮：intent=CHECK_GOALS status=ok
-  回答：要先看清全貌，再把组合决策讲透。教育金缺口是核心目标，需要通过盘活闲置现金、月存定存和加固保障三个动作来完成，不能只靠每月攒钱。
-  确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'alternative_pct', 'cash_pct', 'cashflow_expense', 'cashflow_income', 'cashflow_savings_rate', 'cashflow_surplus', 'dti', 'equity_pct', 'fixed_income_pct', 'goal_1_coverage', 'goal_1_gap', 'liquidity_months', 'net_worth', 'other_pct', 'real_estate_pct', 'wealth_score']
-  关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'alternative_pct=0.0@overview.asset_allocation.classes.alternative.pct', 'cash_pct=0.625@overview.asset_allocation.classes.cash.pct', 'cashflow_expense=30000.0@overview.cashflow.expense', 'cashflow_income=40000.0@overview.cashflow.income', 'cashflow_savings_rate=0.25@overview.cashflow.savings_rate', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=0.3@overview.debt.dti', 'equity_pct=0.375@overview.asset_allocation.classes.equity.pct', 'fixed_income_pct=0.0@overview.asset_allocation.classes.fixed_income.pct', 'goal_1_coverage=0.1@goals.1.coverage', 'goal_1_gap=900000.0@goals.1.gap', 'liquidity_months=16.7@overview.liquidity.emergency_months', 'net_worth=-1200000.0@overview.net_worth', 'other_pct=0.0@overview.asset_allocation.classes.other.pct', 'real_estate_pct=0.0@overview.asset_allocation.classes.real_estate.pct', 'wealth_score=78.0@overview.wealth_score']
-  证据路径：['overview.cashflow.surplus', 'overview.liquidity.emergency_months', 'overview.retirement.nwc', 'overview.wealth_score']
-  行动建议：['确认孩子距离用教育金的剩余年限', '在此基础上拆分存量投入与月存额，并做情景对比']
+第1轮：intent=CHECK_GOALS status=need_clarification
+  回答：需要补充以下信息：孩子年龄和目标用款年份、除房贷外的其他负债信息
+  确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'alternative_pct', 'cash_pct', 'cashflow', 'cashflow_expense', 'cashflow_income', 'cashflow_savings_rate', 'cashflow_surplus', 'dti', 'equity_pct', 'fixed_income_pct', 'goal_1_coverage', 'goal_1_gap', 'goal_completion', 'liquidity', 'net_worth', 'nwc', 'other_pct', 'real_estate_pct', 'rfr', 'wealth_score']
+  关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'alternative_pct=0.0@overview.asset_allocation.classes.alternative.pct', 'cash_pct=0.625@overview.asset_allocation.classes.cash.pct', 'cashflow=0.0@comparison.A.cashflow.delta', 'cashflow_expense=30000.0@overview.cashflow.expense', 'cashflow_income=40000.0@overview.cashflow.income', 'cashflow_savings_rate=0.25@overview.cashflow.savings_rate', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=0.0@comparison.A.dti.delta', 'equity_pct=0.375@overview.asset_allocation.classes.equity.pct', 'fixed_income_pct=0.0@overview.asset_allocation.classes.fixed_income.pct', 'goal_1_coverage=0.1@goals.1.coverage', 'goal_1_gap=900000.0@goals.1.gap', 'goal_completion=0.0@comparison.A.goal_completion.delta', 'liquidity=-6.7@comparison.A.liquidity.delta', 'liquidity=0.0@comparison.A.liquidity.delta', 'net_worth=0.0@comparison.A.net_worth.delta', 'nwc=0.01@comparison.A.nwc.delta', 'nwc=0.08@comparison.A.nwc.delta', 'other_pct=0.0@overview.asset_allocation.classes.other.pct', 'real_estate_pct=0.0@comparison.A.real_estate_pct.delta', 'real_estate_pct=0.0@overview.asset_allocation.classes.real_estate.pct', 'rfr=0.01@comparison.A.rfr.delta', 'rfr=0.08@comparison.A.rfr.delta', 'wealth_score=-2.0@comparison.A.wealth_score.delta', 'wealth_score=0.0@comparison.A.wealth_score.delta']
+  行动建议：['补充孩子当前年龄及预计用款年份。', '确认是否存在其他负债（如车贷）及其金额和期限。']
   铁律：全部通过
-  chat#1：tool_calls=[get_goals,get_allocation,get_cashflow] content='我来帮你分析孩子教育金这个目标。先看一下这个家庭的目标明细和整体资产配置情况。'
-  chat#2：tool_calls=[get_wealth_issues,get_wealth_overview] content='让我再确认一下教育金的具体情况和家庭的问题清单。'
-  chat#3：tool_calls=[无工具] content='我已经看清楚了。先把这件事的完整图景摆出来，再给你讲清楚怎么完成、以及为什么不能只靠"每月攒钱"这一个思路。\n\n---\n\n## 先说你真正要解决的是什么\n\n孩子教育金目标 100 万，你目前只备了 10 万，缺口是 **90 万**。你说"怎么完成"，背后其实是一个组合决策：**用什么钱、以什么方式、花多久，把这个 90 万的洞填上**。它不是一个"每月存多少"的算术题，而是动用了你家庭的**现金'
+  chat#1：tool_calls=[get_goals,get_wealth_issues,get_cashflow,get_allocation] content='我来帮你分析教育金目标的达成路径。先让我调取完整的目标数据和家庭现状。'
+  chat#2：tool_calls=[run_scenario,run_scenario] content='让我跑一个情景模拟，看看把闲置现金配置到固收/权益后对教育金目标的帮助。'
+  chat#3：tool_calls=[无工具] content='让我梳理一下数据，给用户一个清晰的回答。\n\n从数据来看，有几个关键点需要先对齐概念。你问「这个教育金目标怎么完成」，但其实这个问题的答案，跟你家庭当前最大的一个结构性矛盾是绑在一起的。\n\n---\n\n## 先说结论：教育金的缺口，不是靠"多存一点"能填的\n\n你在问「怎么完成」，但你真正的决策是：**怎么用好手里那 50 万趴着不动的现金 + 每月 1 万结余，去把 90 万缺口填上，同时不把家庭其他'
   complete_json#1：keys=['evidence', 'finding', 'missing', 'next_actions', 'recommendations', 'refuse', 'summary', 'tradeoffs', 'uncertainty']
 
 ## 6 退休够不够
@@ -172,14 +166,14 @@
 
 **第1轮 用户**：按现在的情况，我退休够不够？
 第1轮：intent=CHECK_RETIREMENT status=ok
-  回答：按现有路径退休基本够，但只是账面健康，实际存在房贷未计入、零保障、现金配置过高等软肋，显得不够从容，需要补充信息才能确认最终结论。
-  确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'cashflow_expense', 'cashflow_income', 'cashflow_savings_rate', 'cashflow_surplus', 'dti', 'liquidity_months', 'net_worth', 'nwc', 'rfr', 'wealth_score']
-  关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'cashflow_expense=30000.0@overview.cashflow.expense', 'cashflow_income=40000.0@overview.cashflow.income', 'cashflow_savings_rate=0.25@overview.cashflow.savings_rate', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=0.3@overview.debt.dti', 'liquidity_months=16.7@overview.liquidity.emergency_months', 'net_worth=-1200000.0@overview.net_worth', 'nwc=1.24@overview.retirement.nwc', 'rfr=1.24@overview.retirement.rfr', 'wealth_score=78.0@overview.wealth_score']
+  回答：按当前趋势，退休是够的，但'够'得有点松，且建立在房贷正常清掉、教育金不挤占的前提上。真正的短板在于资产配置适配度偏低，现金占比过高、固收为零，若现金继续闲置，
+  确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'cashflow_surplus', 'dti', 'liquidity_months', 'net_worth', 'nwc', 'rfr', 'wealth_score']
+  关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=0.3@overview.debt.dti', 'liquidity_months=16.7@overview.liquidity.emergency_months', 'net_worth=-1200000.0@overview.net_worth', 'nwc=1.24@overview.retirement.nwc', 'rfr=1.24@overview.retirement.rfr', 'wealth_score=78.0@overview.wealth_score']
   证据路径：['overview.liquidity.emergency_months', 'overview.retirement.nwc', 'overview.retirement.rfr', 'overview.wealth_score']
-  行动建议：['提供退休时房贷剩余本金和预计剩余年限', '评估保险需求和保费预算', '制定现金再投资计划']
+  行动建议：['核实当前现金和固收的具体占比，制定再配置方案。', '确认退休年龄和教育金使用计划，以便精确评估对退休覆盖的影响。', "若需要，可测算'重新配置后退休覆盖比'与'维持现金'的对比。"]
   铁律：全部通过
-  chat#1：tool_calls=[get_retirement,get_wealth_overview,get_cashflow,get_wealth_issues] content='我先调取养老测算和家庭全貌数据，看现在的状况。'
-  chat#2：tool_calls=[无工具] content='你的养老测算出来了，我先直接回答你：**按现在的路径，你退休基本够，但"够"得不够厚，而且有几个"看不见的窟窿"没算进去。**\n\n我分三层给你说清楚。\n\n---\n\n## 一、账面结论：养老是"健康"区\n\n你的养老测算结果落在**"养老健康"**象限，资金覆盖比（RFR）和净资产覆盖比（NWC）都是**1.24**——意思是退休时的钱，比退休后需要的钱多出约两成，红线是 1.0，你超过了它。财富评分'
+  chat#1：tool_calls=[get_family_profile,get_retirement,get_wealth_issues,get_wealth_overview] content='我先了解一下这个家庭的全貌和养老测算数据，同时看看主要问题清单。'
+  chat#2：tool_calls=[无工具] content='数据齐了，我来回应你「退休够不够」这个问题。\n\n## 结论先说：按当前趋势，退休是够的，但"够"得有点松\n\n先说一个好消息，再讲两个必须放在心上的前提。\n\n**测算数据本身是健康的。** 按你现在家庭的情况推演到退休时，可用于退休的资产对退休资金需求是**有覆盖的**,测算给出的覆盖比（RFR 和 NWC）都在健康区间，落在"养老健康"象限。也就是说，**如果只看"退休这个目标本身"，你并不缺钱*'
   complete_json#1：keys=['evidence', 'finding', 'missing', 'next_actions', 'recommendations', 'refuse', 'summary', 'tradeoffs', 'uncertainty']
 
 ## 7 钱越来越不够用了怎么办
@@ -197,15 +191,15 @@
 - ✅ 铁律·无内部标识
 
 **第1轮 用户**：我最近感觉钱越来越不够用了，怎么办？
-第1轮：intent=VIEW_OVERVIEW status=ok
-  回答：你的现金流其实并不紧张，真正的问题在于资金效率低、教育金缺口大、且完全没有保险保障，这导致你产生'钱不够用'的感受。
+第1轮：intent=CHECK_ISSUES status=ok
+  回答：你的‘钱不够用’不是收入问题，而是钱摆错了位置、目标没有抓手。当前每月有结余、储蓄健康，但资金闲置过多、配置失衡，且教育金有缺口、无任何保险，这些才是真正的压力
   确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'cashflow_expense', 'cashflow_income', 'cashflow_savings_rate', 'cashflow_surplus', 'dti', 'liquidity_months', 'net_worth', 'wealth_score']
   关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'cashflow_expense=30000.0@overview.cashflow.expense', 'cashflow_income=40000.0@overview.cashflow.income', 'cashflow_savings_rate=0.25@overview.cashflow.savings_rate', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=0.3@overview.debt.dti', 'liquidity_months=16.7@overview.liquidity.emergency_months', 'net_worth=-1200000.0@overview.net_worth', 'wealth_score=78.0@overview.wealth_score']
-  证据路径：['overview.cashflow.savings_rate', 'overview.debt.dti', 'overview.liquidity.emergency_months', 'overview.retirement.nwc', 'overview.wealth_score']
-  行动建议：['确认教育金使用时间，以决定投资风格', '核实现金中超出应急需求的部分，考虑配置到固收产品', '咨询保险方案，为家庭主力配置重疾、意外等基础保障']
+  证据路径：['overview.cashflow.savings_rate', 'overview.liquidity.emergency_months', 'overview.retirement.rfr']
+  行动建议：['梳理‘钱不够用’的具体所指，是每月紧张、攒不下钱，还是担心孩子教育金。', '确认教育金的使用时间与目标金额，判断是否适合配置波动稍高的资产。', '核实当前家庭是否已有任何保险，如有单位保障需评估覆盖范围与缺口。']
   铁律：全部通过
-  chat#1：tool_calls=[get_family_profile,get_wealth_overview,get_wealth_issues,get_cashflow] content='我先理解一下你的处境——"钱越来越不够用"是个很宽泛的感受，我需要先看清这个家庭的真实数据，判断是现金流压力、负债压力，还是别的什么在挤压你们的余钱。\n\n让我先拉取家庭全貌和问题清单。'
-  chat#2：tool_calls=[无工具] content='我先不急着给建议，因为"钱不够用"这个感受和数据对不上——我需要先看清楚再回答。\n\n先说我看到的实际情况：\n\n**你的现金流并不紧张。** 每月收入 4 万，支出 3 万，结余 1 万，储蓄率 25%。按账面上看，你们的家底其实是健康甚至偏稳的——净资产虽然是负的，但那主要是 200 万的房贷在压着，而且月供只占收入的 30%，完全在可承受范围。应急资金更是不缺，能覆盖 16.7 个月的开销，远超'
+  chat#1：tool_calls=[get_family_profile,get_wealth_overview,get_wealth_issues,get_cashflow] content=''
+  chat#2：tool_calls=[无工具] content='我理解你的感受——"钱越来越不够用"，这种感觉往往不是账面上缺了多少钱，而是每月盯着支出、担心这里那里要花钱的那种紧绷感。让我先陪你一起看看，这个家现在的钱到底是怎么流动的。\n\n先跟你确认一下我对你家现状的理解，然后咱们一起拆解。\n\n---\n\n## 先说结论：你的"不够用"，未必是收入不行，而是三件事挤在一起\n\n### 一、你其实不穷，但你的钱"睡"得太多了\n\n你目前的情况是这样的：\n\n- **月'
   complete_json#1：keys=['intent']
   complete_json#2：keys=['evidence', 'finding', 'missing', 'next_actions', 'recommendations', 'refuse', 'summary', 'tradeoffs', 'uncertainty']
 
@@ -217,22 +211,21 @@
 
 - ✅ 不被建档吞
 - ✅ 返回类型
-- ✅ 状态ok
+- ❌ 状态ok
 - ✅ 铁律·数字无编造
 - ✅ 铁律·source 正确
 - ✅ 铁律·status 正确
 - ✅ 铁律·无内部标识
 
 **第1轮 用户**：我应该买什么基金？
-第1轮：intent=CHECK_ALLOCATION status=ok
-  回答：由于档案中收入、支出、资产、负债、保险和目标信息缺失，当前无法给出具体的基金推荐。建议先建档和补充关键信息，再从现金流、用途、保险和目标四方面推进。
+第1轮：intent=CHECK_ALLOCATION status=need_clarification
+  回答：需要补充以下信息：家庭人口数、月收入与支出、是否有房贷等负债、资金用途（购房、养老等）、风险承受能力
   确定性工具(metrics)：['alternative_pct', 'cash_pct', 'cashflow_surplus', 'equity_pct', 'fixed_income_pct', 'net_worth', 'other_pct', 'real_estate_pct', 'wealth_score']
   关键数字：['alternative_pct=0.0@overview.asset_allocation.classes.alternative.pct', 'cash_pct=0.0@overview.asset_allocation.classes.cash.pct', 'cashflow_surplus=0.0@overview.cashflow.surplus', 'equity_pct=0.0@overview.asset_allocation.classes.equity.pct', 'fixed_income_pct=0.0@overview.asset_allocation.classes.fixed_income.pct', 'net_worth=0.0@overview.net_worth', 'other_pct=0.0@overview.asset_allocation.classes.other.pct', 'real_estate_pct=0.0@overview.asset_allocation.classes.real_estate.pct', 'wealth_score=46.0@overview.wealth_score']
-  证据路径：['overview.net_worth', 'overview.wealth_score']
-  行动建议：['记录每月税前收入和大致支出。', '补充保险信息。', '设定理财目标并与顾问讨论现金流。']
+  行动建议：['咨询顾问协助建档', '顾问据此给出方向性判断']
   铁律：全部通过
-  chat#1：tool_calls=[get_family_profile,get_wealth_overview,get_wealth_issues] content='让我先了解一下这个家庭的财务状况，再看这个问题该怎么回答。'
-  chat#2：tool_calls=[无工具] content='我看了你的家庭财务档案，这里有个很关键的情况要先跟你说清楚——**我现在还不能直接告诉你该买什么基金**。\n\n这跟上次你说「30 万现金适不适合投资」时我给出的判断是一致的：目前这份档案里，**收入、支出、资产、负债、保险、目标全部是空的**。财富评分 46、净资产 0，但这些数字反映的是「还没建档」，而不是你真实的财务状况。\n\n## 先说清楚：为什么不能直接回答\n\n「买什么基金」不是一个孤立的选'
+  chat#1：tool_calls=[get_family_profile,get_wealth_overview,get_wealth_issues] content='我先了解一下这个家庭的完整状况，才能判断该不该聊基金、以及聊什么类型的基金。\n\n让我读取财务全景和问题清单。'
+  chat#2：tool_calls=[无工具] content='我先停下来，跟您说句实话——**现在还没到聊"买哪只基金"的时候**。\n\n我读取到的家庭档案是这样的：这个家庭目前**还没有建档**，系统里显示的是零成员、零资产、零收支、零目标——你刚才提到的"30 万现金"，在系统记录里其实也还没有体现。也就是说，我现在手上**没有任何真实数据**能支撑我去判断"买什么基金"。\n\n而且更重要的是，哪怕假设这 30 万都是你自己的钱，答案也**不是闭着眼睛选一只'
   complete_json#1：keys=['intent']
   complete_json#2：keys=['evidence', 'finding', 'missing', 'next_actions', 'recommendations', 'refuse', 'summary', 'tradeoffs', 'uncertainty']
 
@@ -252,40 +245,41 @@
 
 **第1轮 用户**：我想买房，应该先还贷还是留现金？
 第1轮：intent=SCENARIO_COMPARE status=ok
-  回答：在你目前局面里，'留现金'和'提前还贷'都不是核心矛盾——真正该先想清楚的是'你买房到底是怎么个买法'。这个决定没定，前面两个选择都立不住。
-  确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'alternative_pct', 'cash_pct', 'cashflow', 'cashflow_surplus', 'dti', 'equity_pct', 'fixed_income_pct', 'goal_1_coverage', 'goal_1_gap', 'goal_completion', 'liquidity', 'liquidity_months', 'net_worth', 'nwc', 'other_pct', 'real_estate_pct', 'rfr', 'wealth_score']
-  关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'alternative_pct=0.0@overview.asset_allocation.classes.alternative.pct', 'cash_pct=0.625@overview.asset_allocation.classes.cash.pct', 'cashflow=0.0@comparison.A.cashflow.delta', 'cashflow=400.81@comparison.A.cashflow.delta', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=-0.01@comparison.A.dti.delta', 'dti=0.0@comparison.A.dti.delta', 'dti=0.3@overview.debt.dti', 'equity_pct=0.375@overview.asset_allocation.classes.equity.pct', 'fixed_income_pct=0.0@overview.asset_allocation.classes.fixed_income.pct', 'goal_1_coverage=0.1@goals.1.coverage', 'goal_1_gap=900000.0@goals.1.gap', 'goal_completion=0.0@comparison.A.goal_completion.delta', 'liquidity=-9.9@comparison.A.liquidity.delta', 'liquidity=0.0@comparison.A.liquidity.delta', 'liquidity_months=16.7@overview.liquidity.emergency_months', 'net_worth=-1200000.0@overview.net_worth', 'net_worth=0.0@comparison.A.net_worth.delta', 'nwc=0.01@comparison.A.nwc.delta', 'nwc=0.02@comparison.A.nwc.delta', 'other_pct=0.0@overview.asset_allocation.classes.other.pct', 'real_estate_pct=0.0@comparison.A.real_estate_pct.delta', 'real_estate_pct=0.0@overview.asset_allocation.classes.real_estate.pct', 'rfr=0.01@comparison.A.rfr.delta', 'rfr=0.02@comparison.A.rfr.delta', 'wealth_score=-2.0@comparison.A.wealth_score.delta', 'wealth_score=3.0@comparison.A.wealth_score.delta', 'wealth_score=78.0@overview.wealth_score']
-  证据路径：['overview.debt.dti', 'overview.liquidity.emergency_months', 'overview.wealth_score']
-  行动建议：['告诉我买房是置换还是新增，总价和首付预算。', '核实保障缺口，优先配置保险。', '在买房方案明确前，暂缓长期锁定的投资。']
+  回答：需要先确认几个关键信息，才能就‘买房、还贷还是留现金’给出真正有价值的建议。目前的核心矛盾是再买房会同时踩中资产配置适配度偏低和教育金缺口两个已有风险点。房贷利
+  确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'alternative_pct', 'cash_pct', 'cashflow_expense', 'cashflow_income', 'cashflow_savings_rate', 'cashflow_surplus', 'dti', 'equity_pct', 'fixed_income_pct', 'liquidity_months', 'net_worth', 'other_pct', 'real_estate_pct', 'wealth_score']
+  关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'alternative_pct=0.0@overview.asset_allocation.classes.alternative.pct', 'cash_pct=0.625@overview.asset_allocation.classes.cash.pct', 'cashflow_expense=30000.0@overview.cashflow.expense', 'cashflow_income=40000.0@overview.cashflow.income', 'cashflow_savings_rate=0.25@overview.cashflow.savings_rate', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=0.3@overview.debt.dti', 'equity_pct=0.375@overview.asset_allocation.classes.equity.pct', 'fixed_income_pct=0.0@overview.asset_allocation.classes.fixed_income.pct', 'liquidity_months=16.7@overview.liquidity.emergency_months', 'net_worth=-1200000.0@overview.net_worth', 'other_pct=0.0@overview.asset_allocation.classes.other.pct', 'real_estate_pct=0.0@overview.asset_allocation.classes.real_estate.pct', 'wealth_score=78.0@overview.wealth_score']
+  证据路径：['overview.liquidity.emergency_months', 'overview.retirement.nwc']
+  行动建议：['告知新房总价与首付金额', '确认‘还贷’的具体对象（现有房贷或其他借款）及利率', '提供孩子预计使用教育金的年龄']
   铁律：全部通过
-  chat#1：tool_calls=[get_wealth_overview,get_wealth_issues,get_allocation,get_goals] content='我先理清这个家庭当前的全貌和矛盾点，再针对"买房前置考虑"这个决策做判断。'
-  chat#2：tool_calls=[compare_scenarios] content='我需要先确认这个"买房"决策的实际情况。数据里显示你的负债只有一套房贷，之前你也问过"提前还车贷"，但实际没有车贷。所以现在你说"想买房、先还贷还是留现金"，我理解你是在考量：要不要把现有的资金用来**提前还清现有房贷**，还是**留着现金作为买房的储备**（可能是首付或装修等）。\n\n这个决策的关键取决于你想买的房子是在现有的房贷**基础上再叠加贷款**，还是你打算**置换**。让我先模拟两个方向'
-  chat#3：tool_calls=[compare_scenarios] content='我用正确的参数再跑一次对比，同时结合"买房"场景的考量。'
-  chat#4：tool_calls=[run_scenario,run_scenario] content='保留现金的场景不能用"提前还贷0元"来模拟，那是两个不同场景。我分开跑两个独立的单场景来看。'
-  chat#5：tool_calls=[无工具] content='数据已经跑出来了，两个方向的图景非常清晰。让我把它跟你说清楚。\n\n---\n\n先说结论：**在你现在这个局面里，"留现金"和"提前还贷"都不是核心矛盾——真正该先想清楚的是"你买房到底是怎么个买法"**。这个决定没定，前面两个选择都立不住。\n\n**一、先把我看到的真相摊开**\n\n你目前的家庭数据是这样的：\n- 手上有**50万现金**趴在账上，应急金覆盖了**16.7个月**——远超 6 个月的安全'
+  chat#1：tool_calls=[get_wealth_overview,get_wealth_issues,get_allocation,get_cashflow,get_family_profile] content='我来帮你理清这个决策。先让我看看你家现在完整的财务状况。'
+  chat#2：tool_calls=[无工具] content='我注意到一个关键点需要先跟你确认——你之前问过"还车贷"，但我看到的系统里你名下只有**一笔 200 万的房贷**，没有车贷记录。这直接影响整个判断，所以我先把账目说清楚，再帮你理这个"买房还贷 vs 留现金"的决策。\n\n先说结论性的框架，然后我需要你补充几个信息才能给你真正有价值的建议。\n\n---\n\n## 先看你现在卡在什么位置\n\n从你家的数据看，你现在的核心矛盾**不是"还贷还是投资"**，而'
   complete_json#1：keys=['evidence', 'finding', 'missing', 'next_actions', 'recommendations', 'refuse', 'summary', 'tradeoffs', 'uncertainty']
 
 ## 10 取消建档后继续回答原问题
 
-> 轮1 用「投入股票」措辞（非「投资」情景词）→ 现状弹确认卡（G1 吞问题）；弹卡后自动模拟取消（cancel 记录）；轮2 取消+追问 → 原问题必须不丢、继续回答
+> Step 4（G3 闭环）：轮1 建档话术（月收入+存款+带金额配置问题）→ 弹确认卡；自动模拟取消 = 拒绝本次建档 ≠ 拒绝回答——cancel_and_reanswer 把原问题（original_query）重新投入正常 Advisor 路径（filing_declined 跳过建档 gate，防死循环），回答原配置问题（CHECK_ALLOCATION，status=ok，真实配置指标），不再返回「好的，已忽略」。family=filed 让 CHECK_ALLOCATION 有真实配置指标可测
 
 **验收判级**：
 
-- ❌ 不被建档吞
-- ❌ 返回类型
-- ❌ 状态ok
+- ✅ 不被建档吞
+- ✅ 返回类型
+- ✅ 状态ok
+- ❌ 铁律·数字无编造
+- ✅ 铁律·source 正确
+- ✅ 铁律·status 正确
+- ✅ 铁律·无内部标识
 
-**第1轮 用户**：我想把 30 万投入股票，应该怎么分？
-第1轮：⚠️ ConfirmCard（建档确认卡，items=1）
-  → 模拟取消：discarded「好的，已忽略，没有改动你的档案。」（原问题是否保留？）
-
-**第2轮 用户**：我不想建档了，你先回答我的问题
-第2轮：intent=CHECK_ISSUES status=need_clarification
-  回答：需要补充以下信息：闲钱还是保命钱的区分、风险承受能力、资金使用时间、保险和负债情况
-  行动建议：['告知是否预留应急资金', '告知年龄和投资期限', '告知现有负债和保险情况', '告知未来大额支出计划']
-  铁律：全部通过
-  chat#1：tool_calls=[无工具] content='我理解你不想建档，但我们确实遇到了一个现实问题。\n\n你问"我有 30 万现金，现在适不适合投资"和"应该买什么基金"——这两个问题我都还**没法负责任地回答**。原因不是我不想回答，而是我手上关于你的信息几乎是空白的：\n\n从你的家庭概况来看，目前工具里**没有**你任何真实的收入、支出、资产、负债数据（财务指标全部为 0）。换句话说，我连你是什么情况都不了解，就贸然说"适合"或"不适合"、推荐某只'
-  complete_json#1：keys=['evidence', 'finding', 'missing', 'next_actions', 'recommendations', 'refuse', 'summary', 'tradeoffs', 'uncertainty']
+**第1轮 用户**：我月收入 3 万，存款 50 万，这 30 万怎么配置？
+第1轮：⚠️ ConfirmCard（建档确认卡，items=2）→ 用户取消
+  → 取消建档 = 拒绝本次建档 ≠ 拒绝回答：原问题重新回答 ↓
+第1轮：intent=CHECK_ALLOCATION status=ok
+  回答：当前最需要关注：资产配置适配度偏低（配置适配度 51 分）
+  确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'alternative_pct', 'cash_pct', 'cashflow_expense', 'cashflow_income', 'cashflow_savings_rate', 'cashflow_surplus', 'equity_pct', 'fixed_income_pct', 'goal_1_coverage', 'goal_1_gap', 'other_pct', 'real_estate_pct']
+  关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'alternative_pct=0.0@overview.asset_allocation.classes.alternative.pct', 'cash_pct=0.625@overview.asset_allocation.classes.cash.pct', 'cashflow_expense=30000.0@overview.cashflow.expense', 'cashflow_income=40000.0@overview.cashflow.income', 'cashflow_savings_rate=0.25@overview.cashflow.savings_rate', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'equity_pct=0.375@overview.asset_allocation.classes.equity.pct', 'fixed_income_pct=0.0@overview.asset_allocation.classes.fixed_income.pct', 'goal_1_coverage=0.1@goals.1.coverage', 'goal_1_gap=900000.0@goals.1.gap', 'other_pct=0.0@overview.asset_allocation.classes.other.pct', 'real_estate_pct=0.0@overview.asset_allocation.classes.real_estate.pct']
+  证据路径：['overview.asset_allocation.classes.real_estate.pct']
+  行动建议：['明确这笔钱的用途和时间规划', '确认风险承受能力和教育金使用时间']
+  铁律：❌ 数字无编造
+  chat#1：tool_calls=[record_family_info] content='我理解您的问题是希望配置一笔资金，但我需要明确一下：您提到存款50万，说"这30万怎么配置"，我需要确认这30万是否是从存款50万中划出的部分来进行规划。\n\n让我先为您建立基础的家庭财务档案信息。您提到月收入3万、存款50万，我来先记录这些信息。'
 
 ## 11 已有收入是否被重复追问
 
@@ -303,27 +297,27 @@
 
 **第1轮 用户**：帮我看看我的现金流情况
 第1轮：intent=VIEW_OVERVIEW status=ok
-  回答：现金流账面上并不紧张，每月有结余、有储蓄率、应急资金远超安全线，但资金效率低：现金占比过高、固收占比为零，教育金缺口大且无定存计划，应急资金过厚。核心问题是钱没
+  回答：你的现金流本身是健康的，每月有结余，储蓄率和负债率都在安全区间。但真正的压力不在每月钱够不够，而在于钱躺在那里没有发挥该有的作用，存在配置失衡、教育金缺口和现金
   确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'cashflow_expense', 'cashflow_income', 'cashflow_savings_rate', 'cashflow_surplus', 'dti', 'liquidity_months', 'net_worth', 'wealth_score']
   关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'cashflow_expense=30000.0@overview.cashflow.expense', 'cashflow_income=40000.0@overview.cashflow.income', 'cashflow_savings_rate=0.25@overview.cashflow.savings_rate', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=0.3@overview.debt.dti', 'liquidity_months=16.7@overview.liquidity.emergency_months', 'net_worth=-1200000.0@overview.net_worth', 'wealth_score=78.0@overview.wealth_score']
-  证据路径：['overview.cashflow.savings_rate', 'overview.liquidity.emergency_months', 'overview.retirement.nwc', 'overview.wealth_score']
-  行动建议：['确认教育金的使用年龄段，以便制定具体的定存和资产配置方案', '核实并具体梳理当前资产结构，尤其是现金和固收的占比数据']
+  证据路径：['overview.cashflow.savings_rate', 'overview.debt.dti', 'overview.liquidity.emergency_months']
+  行动建议：["明确'不够用'的具体含义。", '做闲置现金转固收的情景模拟。', '做教育金每月定存金额的情景模拟。']
   铁律：全部通过
-  chat#1：tool_calls=[get_cashflow,get_wealth_issues,get_family_profile] content=''
-  chat#2：tool_calls=[无工具] content='你问到点子上了——现金流是这整个家庭财务的"发动机"，我帮你把全貌讲清楚。\n\n先别急着看数字，我注意到你的现金流里有一个**关键的隐藏项**，让我先用数据说话。\n\n---\n\n## 你的现金流全貌\n\n**收入侧**：每月 40,000（本人 25,000 + 配偶 15,000），单一来源——全部是工资，没有其他被动收入。\n\n**支出侧**：每月 30,000，分两块——\n- **固定支出**：教育'
+  chat#1：tool_calls=[get_cashflow,get_wealth_issues,get_wealth_overview] content=''
+  chat#2：tool_calls=[无工具] content='你的现金流我已经调出来看了一遍。先给你一个整体判断，再拆开讲。\n\n---\n\n## 一句话结论\n\n**你的现金流本身是健康的——这不是你需要担心的地方。**真正的压力不在"每月钱够不够"，而在"钱躺在那里没有发挥该有的作用"。\n\n---\n\n## 现金流全景\n\n**每月进账**：工资 4 万（唯一收入来源）\n\n**每月支出**：3 万，其中——\n- **固定支出**：教育 3 千（这部分不能省）\n- '
   complete_json#1：keys=['intent']
   complete_json#2：keys=['evidence', 'finding', 'missing', 'next_actions', 'recommendations', 'refuse', 'summary', 'tradeoffs', 'uncertainty']
 
 **第2轮 用户**：我收入多少你不是知道吗，为什么还要问
 第2轮：intent=EXPLAIN_RESULT status=ok
-  回答：顾问承认自己表达不当，确认已知用户及配偶收入，并指出真正不确定的是支出结构与主动选择。同时重新核对了家庭财务，发现账面稳健（月结余、应急金充足、负债健康），但存
-  确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'cashflow_surplus', 'dti', 'liquidity_months', 'net_worth', 'wealth_score']
-  关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=0.3@overview.debt.dti', 'liquidity_months=16.7@overview.liquidity.emergency_months', 'net_worth=-1200000.0@overview.net_worth', 'wealth_score=78.0@overview.wealth_score']
-  证据路径：['overview.cashflow.savings_rate', 'overview.cashflow.surplus', 'overview.debt.dti', 'overview.liquidity.emergency_months']
-  行动建议：['与用户确认优先关注的领域：风险（保险）、教育金或日常支出', '制定保险配置方案', '规划教育金月存金额并执行', '调整现金与固收、股票的配置比例']
+  回答：顾问确认收入数据已知，提问是为了明确用户具体困惑指向哪一笔账。现金流本身健康，问题在于资金配置和风险保障缺口。
+  确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'cashflow_expense', 'cashflow_income', 'cashflow_savings_rate', 'cashflow_surplus', 'dti', 'liquidity_months', 'net_worth', 'wealth_score']
+  关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'cashflow_expense=30000.0@overview.cashflow.expense', 'cashflow_income=40000.0@overview.cashflow.income', 'cashflow_savings_rate=0.25@overview.cashflow.savings_rate', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=0.3@overview.debt.dti', 'liquidity_months=16.7@overview.liquidity.emergency_months', 'net_worth=-1200000.0@overview.net_worth', 'wealth_score=78.0@overview.wealth_score']
+  证据路径：['overview.liquidity.emergency_months', 'overview.retirement.nwc', 'overview.wealth_score']
+  行动建议：["向用户澄清'不够用'具体指哪一笔账", '核实教育金目标与当前储备数据是否准确', '评估应急金合理规模，并规划超额资金用途', '分析家庭保障缺口，探讨保险配置方案']
   铁律：全部通过
-  chat#1：tool_calls=[get_family_profile,get_wealth_issues,get_wealth_overview] content='你的质疑很合理，我先说一下为什么。\n\n我确实看到了你的月收入（来自 overview 的现金流数据），所以"收入多少"这个数字本身不用再问你。\n\n但是你上一次的问题其实是——"钱越来越不够用，怎么办"，这是**我对你整体的财富状况还没有完全掌握**时才需要追问的。不过既然你直接点出这一点，说明你已经对我的判断有疑问了，那我们应该先把你的真实处境看清楚。\n\n让我先把你家的全貌和问题清单拉出来，重新核'
-  chat#2：tool_calls=[无工具] content='我重新看了你的完整数据，先把话说明白：**你的收入我确实知道——你自己月入 2.5 万，配偶月入 1.5 万，家庭月入合计 4 万。**\n\n所以你说的没错，我不该用"问你收入"来开场。是我之前表达不当——我真正不确定的，不是收入本身，而是**你每个月的钱到底花到哪里去了、哪些是你的主动选择**。因为只有搞清这个，"钱不够用"的答案才成立。\n\n不过既然你直接指出了这一点，我也把你现在的家底彻底核了一'
+  chat#1：tool_calls=[get_wealth_overview,get_cashflow,get_wealth_issues] content='你说得对，之前确实聊过，我先跟你确认一下我看到的现状，看看有没有漏了什么新变化。\n\n让我调一下你的最新数据，用事实来对齐，不凭记忆说话。'
+  chat#2：tool_calls=[无工具] content='你说得对，你的收入我这边确实有记录——月收入 4 万、每月结余 1 万、储蓄率 25% 这些都在数据里，我不用问你。\n\n我之所以会问，是因为**收入只是起点**，真正决定"钱够不够用"的不是进账多少，而是钱怎么摆。我缺的不是你的收入数字，而是你心里那个具体的困惑——你说"钱越来越不够用"，那你算的到底是哪一笔账？\n\n我先给你对一下我看到的事实，你看看是不是同一件事：\n\n**你的现金流本身是健康的*'
   complete_json#1：keys=['evidence', 'finding', 'missing', 'next_actions', 'recommendations', 'refuse', 'summary', 'tradeoffs', 'uncertainty']
 
 ## 12 从目标页问顾问，首轮直接回答目标问题
@@ -342,13 +336,12 @@
 
 **第1轮 用户**：这个教育金目标怎么完成？
 第1轮：intent=CHECK_GOALS status=ok
-  回答：教育金目标靠每月多存难以完成，主要问题在于现金闲置、资金效率低，应先盘活存量现金，同时需要补充关键信息才能给出具体储蓄方案。
-  确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'alternative_pct', 'cash_pct', 'cashflow', 'cashflow_expense', 'cashflow_income', 'cashflow_savings_rate', 'cashflow_surplus', 'dti', 'equity_pct', 'fixed_income_pct', 'goal_1_coverage', 'goal_1_gap', 'goal_completion', 'liquidity', 'net_worth', 'nwc', 'other_pct', 'real_estate_pct', 'rfr', 'wealth_score']
-  关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'alternative_pct=0.0@overview.asset_allocation.classes.alternative.pct', 'cash_pct=0.625@overview.asset_allocation.classes.cash.pct', 'cashflow=0.0@comparison.A.cashflow.delta', 'cashflow_expense=30000.0@overview.cashflow.expense', 'cashflow_income=40000.0@overview.cashflow.income', 'cashflow_savings_rate=0.25@overview.cashflow.savings_rate', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'dti=0.0@comparison.A.dti.delta', 'equity_pct=0.375@overview.asset_allocation.classes.equity.pct', 'fixed_income_pct=0.0@overview.asset_allocation.classes.fixed_income.pct', 'goal_1_coverage=0.1@goals.1.coverage', 'goal_1_gap=900000.0@goals.1.gap', 'goal_completion=0.0@comparison.A.goal_completion.delta', 'liquidity=0.0@comparison.A.liquidity.delta', 'net_worth=0.0@comparison.A.net_worth.delta', 'nwc=0.0@comparison.A.nwc.delta', 'other_pct=0.0@overview.asset_allocation.classes.other.pct', 'real_estate_pct=0.0@comparison.A.real_estate_pct.delta', 'real_estate_pct=0.0@overview.asset_allocation.classes.real_estate.pct', 'rfr=0.0@comparison.A.rfr.delta', 'wealth_score=0.0@comparison.A.wealth_score.delta']
-  证据路径：['overview.asset_allocation.classes.real_estate.pct']
-  行动建议：['告诉顾问孩子大概几年后需要用这笔钱', '无论用钱时间多近，先盘活超过应急所需的闲置现金并补充固收配置']
+  回答：教育金目标存在真实缺口，但现金流健康。解决思路是先调动过剩现金补仓固收，再设定每月定存计划。缺乏目标日期和每月定存金额，无法给出具体计算，需要用户补充信息。
+  确定性工具(metrics)：['ALLOCATION_LOW_FITNESS_001_allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months', 'GOALS_GAP_001_gap', 'cashflow_expense', 'cashflow_income', 'cashflow_savings_rate', 'cashflow_surplus', 'goal_1_coverage', 'goal_1_gap']
+  关键数字：['ALLOCATION_LOW_FITNESS_001_allocation_fitness=51.0@issues.ALLOCATION_LOW_FITNESS_001.metric.allocation_fitness', 'ALLOCATION_LOW_FITNESS_001_real_estate_pct=0.0@issues.ALLOCATION_LOW_FITNESS_001.metric.real_estate_pct', 'DECISION_IDLE_CASH_001_emergency_months=16.7@issues.DECISION_IDLE_CASH_001.metric.emergency_months', 'GOALS_GAP_001_gap=900000.0@issues.GOALS_GAP_001.metric.gap', 'cashflow_expense=30000.0@overview.cashflow.expense', 'cashflow_income=40000.0@overview.cashflow.income', 'cashflow_savings_rate=0.25@overview.cashflow.savings_rate', 'cashflow_surplus=10000.0@overview.cashflow.surplus', 'goal_1_coverage=0.1@goals.1.coverage', 'goal_1_gap=900000.0@goals.1.gap']
+  证据路径：['overview.cashflow.savings_rate']
+  行动建议：['补充孩子预计用钱的时间点，设定目标日期', '设定每月定存金额', '开始每月定存，使教育金覆盖率逐步上升']
   铁律：全部通过
-  chat#1：tool_calls=[get_goals,get_wealth_issues,get_cashflow,get_allocation] content='我来帮你看看教育金目标的情况。先调取家庭目标和相关财务数据。'
-  chat#2：tool_calls=[run_scenario] content='我来模拟一个"每月定存教育金"的方案，看看要走多久才能填上这个缺口。\n\n让我先看下如果每月把结余的一部分投入教育金，能覆盖多少。'
-  chat#3：tool_calls=[无工具] content='我已经拿到了完整的数据。让我直接给你把这件事讲清楚。\n\n---\n\n先给你一个直接的判断：**这个教育金目标，靠"每月多存一点"很难完成，因为缺口太大（900,000元），而你的主要矛盾不在这里。**\n\n我看一下账面数字，帮你算一笔"够不够"的账：\n\n**缺口有多大**\n- 目标需要 1,000,000 元，目前只备了 100,000 元，**缺口 900,000 元**。教育金占比极低（只有目标的'
+  chat#1：tool_calls=[get_goals,get_cashflow,get_wealth_issues] content='我先了解一下家庭的目标和当前资金状况，才能给你真正可落地的方案。'
+  chat#2：tool_calls=[无工具] content='先给你说清楚当前这笔教育金的真实处境，再看怎么补。\n\n**现在的状况**\n\n你为孩子教育金设的目标是 100 万，目前已经备了 10 万，缺口是 90 万（coverage 只有 10%）。这是 P2 的问题——不是最急的 P1，但它是真实存在的硬缺口，不像现金闲置那种"钱多到不知道放哪"，这个是实实在在差一大截。\n\n关键点在于：**你的现金流本身是健康的**——每月收入 4 万、支出 3 万、结'
   complete_json#1：keys=['evidence', 'finding', 'missing', 'next_actions', 'recommendations', 'refuse', 'summary', 'tradeoffs', 'uncertainty']

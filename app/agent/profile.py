@@ -108,14 +108,36 @@ def create_confirm(family_id: int, actions: list[dict[str, Any]],
     )
 
 
+def cancel_confirmation(family_id: int, pending_id: str
+                        ) -> tuple[AppliedResponse, str | None, object]:
+    """弹出并消费 pending 的「取消」分支（Step 4，G3 底座）。
+
+    返回 (discarded 响应, 原问题 original_query, 解析后 advisor_context)——
+    原问题与 ctx 供 Step 4 的 cancel_and_reanswer 重新投入回答路径：
+    **取消 = 拒绝本次建档 ≠ 拒绝回答**（用户取消的是数据录入动作，不是自己的问题）。
+    pending 失效/跨家庭 → (error, None, None)。弹出即消费，不重复处理。
+    """
+    pending = _PENDING.pop(pending_id, None)
+    if pending is None or pending["family_id"] != family_id:
+        return (AppliedResponse(type="error", message="该确认已失效，请重新输入。"),
+                None, None)
+    return (AppliedResponse(type="discarded", message="好的，已忽略，没有改动你的档案。",
+                            original_query=pending.get("original_query")),
+            pending.get("original_query"), pending.get("advisor_context"))
+
+
 def apply_confirmation(family_id: int, pending_id: str, confirmed: bool) -> AppliedResponse:
-    """确认（写库）或忽略待定动作。pending 失效/跨家庭 → error。"""
+    """确认（写库）或忽略待定动作。pending 失效/跨家庭 → error。
+
+    取消分支委托 cancel_confirmation（弹出 pending 并携带原问题 + ctx）；
+    确认分支直接消费 pending 写库。两者共享同一 pending，互斥。
+    """
+    if not confirmed:
+        resp, _, _ = cancel_confirmation(family_id, pending_id)
+        return resp
     pending = _PENDING.pop(pending_id, None)
     if pending is None or pending["family_id"] != family_id:
         return AppliedResponse(type="error", message="该确认已失效，请重新输入。")
-    if not confirmed:
-        return AppliedResponse(type="discarded", message="好的，已忽略，没有改动你的档案。",
-                               original_query=pending.get("original_query"))
     for action in pending["actions"]:
         db.apply_action(family_id, action)
         # 顾问知识类事实（目标）写记忆层：版本化记录目标历史，检测目标变化。

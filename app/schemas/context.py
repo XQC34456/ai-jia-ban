@@ -61,6 +61,11 @@ class AdvisorContextRequest(BaseModel):
     query: str | None = None            # 用户真正想解决的问题（缺省 = 本次 message）
     payload: dict[str, Any] = Field(default_factory=dict)  # 标识 + 用户新声明事实
     first_turn_action: str | None = None  # 顾问第一轮应该做什么（暂只记录，不消费）
+    # Step 4 语义（G3「取消建档后继续回答」的代码层标记）：
+    # filing_declined = True 表示「用户已拒绝本次建档」——取消的是数据录入动作，不是自己的问题。
+    # converse() 据此跳过同一次建档 gate（防死循环），把原问题重新投入正常回答路径。
+    # 一次性语义：只出现在取消后那次 re-answer 请求上，不粘滞、不持久化。
+    filing_declined: bool = False
 
     @model_validator(mode="after")
     def _strip_forbidden_payload(self) -> "AdvisorContextRequest":

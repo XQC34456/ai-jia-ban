@@ -188,7 +188,13 @@ export const ChatView = {
       msg.resolved = true;
       try {
         const d = await api('/api/confirm', { method: 'POST', body: { pending_id: msg.pendingId, confirmed: ok }, token: store.auth.token });
-        store.chat.messages.push({ who: 'bot', text: d.message });
+        // Step 4：取消建档 ≠ 拒绝回答——后端把原问题重新投入回答路径，返回完整回答。
+        // 带 intent 的响应渲染为完整 agent 气泡（复用 send 路径），否则回退纯文本（discarded/error）。
+        if (!ok && d.intent) {
+          store.chat.messages.push({ who: 'bot', agent: d });
+        } else {
+          store.chat.messages.push({ who: 'bot', text: d.message });
+        }
         if (d.type === 'applied') invalidateCaches();
       } catch (e) {
         chatError.value = e.message || '确认失败';
