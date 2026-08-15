@@ -44,7 +44,7 @@ LLM_MODEL=deepseek-chat
 
 > 换豆包/通义/GLM 等 OpenAI 兼容接口，改 `LLM_BASE_URL` 和 `LLM_MODEL` 即可。
 
-> **现状说明**：AI 顾问当前为 Level 0（确定性引擎 + LLM 做意图路由/参数抽取），回答仍是确定性模板。核心工程「AI Advisor V2」（让 AI 顾问真正理解家庭、调用工具、做决策）见 [docs/plan-ai-advisor-core-architecture.md](docs/plan-ai-advisor-core-architecture.md)。
+> **现状说明**：AI 顾问当前为 Level 0（确定性引擎 + LLM 做意图路由/参数抽取），回答仍是确定性模板。V1.0 产品重构目标是把产品从「财报生成器」拉回「长期家庭财富 AI 顾问」，战略主纲见 [docs/plan-v10-restructure.md](docs/plan-v10-restructure.md)，现状核对见 [docs/verification-v10-current-state.md](docs/verification-v10-current-state.md)，顾问核心架构见 [docs/plan-ai-advisor-core-architecture.md](docs/plan-ai-advisor-core-architecture.md)。
 
 ---
 
@@ -124,15 +124,13 @@ AI 顾问层   app/agent/    converse() 统一入口 → 建档吸收(确认卡�
 - AI 顾问统一收口（`/api/chat` 退役；`/api/agent/chat` 唯一入口；建档确认吸收进 Agent；CHECK_ISSUES/CHECK_GOALS/EXPLAIN_RESULT 由 `build_issues`/`build_goals` 确定性产出）
 - 人性化落地（体检报告横幅 / 「为什么」自然语言解释 / 「模拟」按钮跳沙盘 / 沙盘模式提示 / 冷启动向导）
 
-## 下一步：AI Advisor V2（核心工程）
+## 下一步：V1.0 产品重构（Phase 1 顾问核心重构）
 
-AI 顾问从 Level 0（确定性引擎 + LLM 分类器）升级为 Level 5（能持续「理解 → 数据 → 推理 → 模拟 → 决策」的财富 Agent）：
+产品从「财报生成器」回到「长期家庭财富 AI 顾问」——顾问是主入口，其余模块是能力底座。现状核对已确认 4 条真缺口（建档优先 / 建档问答耦合 / 取消建档丢问题 / 无澄清循环）。
 
-- **V2.1 Context Engine** — 让 AI 看见家庭数据
-- **V2.2 Tool Calling** — 给 AI 只读工具（Engine 已就绪，只需暴露）
-- **V2.3 Advisor Brain** — 状态机 + 六步 SOP + 修复「为什么」死分支
-- **V2.4 Conversation Memory** — 多轮记忆
-- **V2.5 Proactive Advisor** — 主动提醒（后期，需调度器）
-- **V2.6 Action Loop** — 推动行动
+**Phase 1（当前）**：
+- Advisor Benchmark — 12 个真实问题建立回归基线
+- AdvisorContext 契约 — 跨页面「问顾问」结构化传参，替代纯文本预填
+- 两条路径重构 — 跨页面问顾问 / 取消建档后继续回答
 
-> 详见 [docs/plan-ai-advisor-core-architecture.md](docs/plan-ai-advisor-core-architecture.md)（唯一主体计划）。
+> 战略主纲 [docs/plan-v10-restructure.md](docs/plan-v10-restructure.md) · 现状核对 [docs/verification-v10-current-state.md](docs/verification-v10-current-state.md) · 实施路线图 [docs/plan-master-roadmap.md](docs/plan-master-roadmap.md) · 顾问核心架构 [docs/plan-ai-advisor-core-architecture.md](docs/plan-ai-advisor-core-architecture.md)

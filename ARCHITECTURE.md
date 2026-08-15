@@ -52,8 +52,10 @@ AI 不负责：凭经验计算任何财务数字
 ```
 
 - **API v1 契约**：见 `docs/api-contract-v1.md`（已冻结）。
-- **主路线图**：见 `docs/plan-master-roadmap.md`（唯一总纲）。
-- **主体计划（AI Advisor V2）**：见 `docs/plan-ai-advisor-core-architecture.md`。
+- **战略主纲（V1.0）**：见 `docs/plan-v10-restructure.md`（唯一总纲，产品做什么）。
+- **现状核对**：见 `docs/verification-v10-current-state.md`（8 条论断代码取证）。
+- **实施路线图**：见 `docs/plan-master-roadmap.md`（Phase 0-8 怎么落地）。
+- **顾问核心架构**：见 `docs/plan-ai-advisor-core-architecture.md`（六阶段顾问循环 + 问答建档解耦）。
 
 ---
 
