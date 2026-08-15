@@ -144,7 +144,7 @@ export const ChatView = {
       try {
         const d = await api('/api/agent/chat', { method: 'POST', body: { message: text }, token: store.auth.token });
         if (d.type === 'confirm') {
-          store.chat.messages.push({ type: 'confirm', pendingId: d.pending_id, message: d.message, items: d.items, resolved: false });
+          store.chat.messages.push({ type: 'confirm', pendingId: d.pending_id, message: d.message, items: d.items, groups: d.groups || [], resolved: false });
         } else {
           store.chat.messages.push({ who: 'bot', agent: d });
         }
@@ -375,12 +375,18 @@ export const ChatView = {
     <div class="chat-scroll card">
       <div v-if="!store.chat.messages.length" class="chat-empty">
         👋 你好，我是你的 AI 家办顾问。<br />
-        试着告诉我你的家庭情况，例如：「我月薪 2 万，老婆 1 万 5，房贷月供 8000，存款 50 万」。
+        试着告诉我你的家庭情况，例如：「我月收入 3.8 万，房贷 3000，房租 5000，车贷 3500，孩子学费 3000，生活费 5000」。
       </div>
       <div v-for="(m, idx) in store.chat.messages" :key="idx">
         <div v-if="m.type === 'confirm'" class="chat-confirm">
           <div class="chat-confirm-text">{{ m.message }}</div>
-          <ul><li v-for="(it, i) in m.items" :key="i">{{ it }}</li></ul>
+          <div v-if="m.groups && m.groups.length" class="confirm-groups">
+            <div v-for="(g, gi) in m.groups" :key="gi" class="confirm-group">
+              <div class="confirm-group-head">{{ g.icon }} {{ g.label }}</div>
+              <ul class="confirm-group-items"><li v-for="(it, i) in g.items" :key="i">{{ it }}</li></ul>
+            </div>
+          </div>
+          <ul v-else><li v-for="(it, i) in m.items" :key="i">{{ it }}</li></ul>
           <div class="chat-confirm-actions">
             <template v-if="!m.resolved">
               <button class="btn-primary btn-sm" @click="confirm(m, true)">确认</button>

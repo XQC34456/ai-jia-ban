@@ -539,6 +539,9 @@ button { font-family: inherit; }
 .chat-confirm-text { font-size: 13px; margin-bottom: 8px; }
 .chat-confirm ul { margin: 0 0 10px; padding-left: 18px; font-size: 13px; }
 .chat-confirm-actions { display: flex; gap: 8px; align-items: center; }
+.confirm-group { margin: 6px 0; }
+.confirm-group-head { font-weight: 600; font-size: 13px; color: #4A443C; margin-bottom: 2px; }
+.confirm-group-items { margin: 0 0 2px; }
 
 .chat-agent {
   align-self: flex-start; max-width: 84%; background: var(--bg-soft);
