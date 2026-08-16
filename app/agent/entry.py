@@ -5,6 +5,8 @@ V2.2/V2.3 将全量消费）。A3 handle() 编排逻辑零改动，仅扩展可�
 """
 from __future__ import annotations
 
+import re
+
 from .. import db
 from ..schemas.agent import AgentResponse, ConfirmCard
 from ..schemas.context import QUESTION_SOURCES, AdvisorContext, build_advisor_context
@@ -22,6 +24,31 @@ _FILING_CLARIFY_SUMMARY = (
     "我识别到你在介绍家庭财务情况，但有些金额我还没听清。"
     "请说得更具体些，例如：月收入多少、房贷月供多少、存款大概多少。"
 )
+
+# 字段级精准追问规则表（第四刀「缺数检测」）：建档路径抽空但像建档时，
+# 按用户原话命中的财务类别精准追问「缺的那个字段」，而非笼统打回重新描述。
+# 顺序敏感：负债（含「房贷」）在房产前，支出在收入前——避免关键词误命中。
+_FILING_CLARIFY_RULES: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"存款|现金|活期|应急金|闲钱"), "你刚才提到存款/现金，具体有多少钱？"),
+    (re.compile(r"房贷|车贷|消费贷|信用卡|月供"), "你刚才提到的负债，月供或剩余本金大概多少？"),
+    (re.compile(r"支出|开销|花销|房租|学费|生活费"), "你每月支出大概多少？"),
+    (re.compile(r"月薪|工资|月入|月收入|收入"), "你月收入大概多少？"),
+    (re.compile(r"基金|股票|理财"), "你刚才提到的基金/股票/理财，投了多少钱？"),
+    (re.compile(r"房产|房子"), "你的房产估值或房贷大概多少？"),
+    (re.compile(r"教育|养老|退休|买房|创业|目标|攒|准备"), "你想存的目标金额大概多少？期限是？"),
+]
+
+
+def _filing_clarify(message: str) -> str:
+    """按用户原话命中类别 → 字段级精准追问；无命中 → 回退笼统 _FILING_CLARIFY_SUMMARY。
+
+    纯函数：只负责追问文案，不碰 extraction / 计算 / 写库。未知类别（保险等）
+    绝不硬猜，回退原笼统文案兜底。
+    """
+    for pat, question in _FILING_CLARIFY_RULES:
+        if pat.search(message):
+            return question
+    return _FILING_CLARIFY_SUMMARY
 
 
 def converse(message: str, user: dict, llm: LLMProvider | None = None,
@@ -56,7 +83,7 @@ def converse(message: str, user: dict, llm: LLMProvider | None = None,
             db.record_event(family_id, "intent_asked", intent="filing",
                             meta={"status": "need_clarification"})
             return build_response("EXPLAIN_RESULT", "need_clarification", None,
-                                  summary=_FILING_CLARIFY_SUMMARY)
+                                  summary=_filing_clarify(message))
     wealth_context = _wealth_context_text(user)
     invalidation = detect_invalidation(family_id)   # 先确定性失效检测（标记 stale）
     if invalidation:
